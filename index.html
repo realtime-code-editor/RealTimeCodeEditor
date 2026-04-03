@@ -1,18 +1,54 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Test Socket</title>
+  <title>Socket.IO Rooms Test</title>
 </head>
 <body>
-  <h1>Socket Test</h1>
+  <h1>Real-Time Collaboration: Rooms</h1>
 
+  <!-- Input to choose room -->
+  <label for="roomInput">Enter Room Name:</label>
+  <input type="text" id="roomInput" placeholder="Room1" />
+  <button id="joinBtn">Join Room</button>
+
+  <h3>Console Messages:</h3>
+  <ul id="messages"></ul>
+
+  <!-- Socket.IO client library -->
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
+    // Connect to backend server
     const socket = io("http://localhost:3000");
 
+    const messages = document.getElementById("messages");
+    const joinBtn = document.getElementById("joinBtn");
+    const roomInput = document.getElementById("roomInput");
+
+    // Show connection in console
     socket.on("connect", () => {
-      console.log("Connected to server:", socket.id);
+      const li = document.createElement("li");
+      li.textContent = `Connected to server with ID: ${socket.id}`;
+      messages.appendChild(li);
     });
+
+    // Join a room when button is clicked
+    joinBtn.addEventListener("click", () => {
+      const roomName = roomInput.value.trim();
+      if (roomName) {
+        socket.emit("join-room", roomName);  // Send join-room event to server
+        const li = document.createElement("li");
+        li.textContent = `You joined room: ${roomName}`;
+        messages.appendChild(li);
+      }
+    });
+
+    // Listen when another user joins the same room
+    socket.on("user-joined", (userId) => {
+      const li = document.createElement("li");
+      li.textContent = `New user joined your room: ${userId}`;
+      messages.appendChild(li);
+    });
+
   </script>
 </body>
 </html>
