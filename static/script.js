@@ -13,6 +13,31 @@ document.addEventListener("DOMContentLoaded", () => {
     const outputConsole = document.getElementById("output-console");
     const clearBtn = document.getElementById("clear-btn");
     const stdinInput = document.getElementById("stdin-input");
+    const usersDropdown = document.getElementById("users-dropdown");
+    const copyRoomBtn = document.getElementById("copy-room-btn");
+
+    function updateUsersDropdown(users) {
+        if (!usersDropdown || !users) return;
+        usersDropdown.innerHTML = '';
+        users.forEach(u => {
+            const el = document.createElement('div');
+            el.className = 'user-item';
+            el.innerHTML = `<span class="dot"></span> ${u}`;
+            usersDropdown.appendChild(el);
+        });
+    }
+    
+    if (copyRoomBtn) {
+        copyRoomBtn.addEventListener("click", () => {
+            navigator.clipboard.writeText(room).then(() => {
+                const originalSvg = copyRoomBtn.innerHTML;
+                copyRoomBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+                setTimeout(() => {
+                    copyRoomBtn.innerHTML = originalSvg;
+                }, 2000);
+            });
+        });
+    }
 
     // Map backend language keys to Monaco language identifiers
     const languageMap = {
@@ -172,6 +197,7 @@ document.addEventListener("DOMContentLoaded", () => {
             isUpdatingFromServer = false;
             
             userCountEl.innerText = data.userCount;
+            updateUsersDropdown(data.users);
         });
 
         // Handle incoming live updates from other users
@@ -200,6 +226,8 @@ document.addEventListener("DOMContentLoaded", () => {
             setTimeout(() => {
                 userCountEl.style.color = '';
             }, 300);
+            
+            updateUsersDropdown(data.users);
         });
 
         // Handle execution output sync

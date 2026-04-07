@@ -2,6 +2,10 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_socketio import SocketIO, join_room, leave_room, emit
 import requests
 import os
+import random
+import string
+import subprocess
+import tempfile
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -14,18 +18,21 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # State structure to hold room data: dict mapping room_id -> {'code': string, 'users': dict of sid -> username}
 rooms = {}
 
-# Judge0 API supported runtimes mapping
-JUDGE0_VERSIONS = {
-    'python': 71,
-    'javascript': 63,
-    'c': 50,
-    'c++': 54
-}
+
 
 @app.route('/')
 def index():
     """Renders the join room page."""
     return render_template('index.html')
+
+@app.route('/create-room', methods=['POST'])
+def create_room():
+    """Creates a new room with an auto-generated code."""
+    username = request.form.get('username')
+    if not username:
+        return redirect(url_for('index'))
+    room_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    return redirect(url_for('editor', username=username, room=room_code))
 
 @app.route('/editor')
 def editor():
@@ -52,62 +59,73 @@ def run_code():
     if not code or not language:
         return jsonify({"error": "Code and language are required"}), 400
         
-    language_id = JUDGE0_VERSIONS.get(language)
-    if not language_id:
-        return jsonify({"error": "Language not supported"}), 400
-    
-    payload = {
-        "language_id": language_id,
-        "source_code": code,
-        "stdin": stdin_data
-    }
-    
-    headers = {
-        "x-rapidapi-key": os.environ.get('RAPIDAPI_KEY', 'YOUR_API_KEY'),
-        "x-rapidapi-host": "judge0-ce.p.rapidapi.com",
-        "Content-Type": "application/json"
-    }
-    
-    try:
-        response = requests.post(
-            'https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=false&wait=true', 
-            json=payload, 
-            headers=headers,
-            timeout=15
-        )
+    with tempfile.TemporaryDirectory() as temp_dir:
+        file_path = ""
+        cmd = []
+        compile_cmd = []
         
-        if response.status_code != 200 and response.status_code != 201:
+        if language == 'python':
+            file_path = os.path.join(temp_dir, 'main.py')
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(code)
+            cmd = ['python', file_path]
+            
+        elif language == 'javascript':
+            file_path = os.path.join(temp_dir, 'main.js')
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(code)
+            cmd = ['node', file_path]
+            
+        elif language == 'c':
+            file_path = os.path.join(temp_dir, 'main.c')
+            exe_path = os.path.join(temp_dir, 'main.exe' if os.name == 'nt' else 'main')
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(code)
+            compile_cmd = ['gcc', file_path, '-o', exe_path]
+            cmd = [exe_path]
+            
+        elif language == 'c++':
+            file_path = os.path.join(temp_dir, 'main.cpp')
+            exe_path = os.path.join(temp_dir, 'main.exe' if os.name == 'nt' else 'main')
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(code)
+            compile_cmd = ['g++', file_path, '-o', exe_path]
+            cmd = [exe_path]
+            
+        elif language == 'java':
+            file_path = os.path.join(temp_dir, 'Main.java')
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(code)
+            compile_cmd = ['javac', file_path]
+            cmd = ['java', '-cp', temp_dir, 'Main']
+        else:
+            return jsonify({"output": "Unsupported language for local execution.", "isError": True})
+            
+        try:
+            if compile_cmd:
+                compile_process = subprocess.run(compile_cmd, capture_output=True, text=True, timeout=10)
+                if compile_process.returncode != 0:
+                    return jsonify({"output": compile_process.stderr, "isError": True})
+                    
+            process = subprocess.run(cmd, input=stdin_data, capture_output=True, text=True, timeout=10)
+            
+            output = process.stdout
+            if process.returncode != 0:
+                output += "\nError:\n" + process.stderr
+                return jsonify({"output": output.strip(), "isError": True})
+                
             return jsonify({
-                "output": f"Error: API returned {response.status_code}\n{response.text}",
-                "isError": True
+                "output": output.strip() if output.strip() else "Program finished with no output.",
+                "isError": False
             })
             
-        result = response.json()
-        
-        # Judge0 execution result format
-        stderr = result.get('stderr')
-        compile_output = result.get('compile_output')
-        stdout = result.get('stdout')
-        
-        if compile_output:
-            return jsonify({
-                "output": compile_output,
-                "isError": True
-            })
-            
-        if stderr:
-            return jsonify({
-                "output": stderr,
-                "isError": True
-            })
-            
-        return jsonify({
-            "output": stdout if stdout is not None else "No output",
-            "isError": False
-        })
-        
-    except requests.exceptions.RequestException as e:
-        return jsonify({"output": f"Execution request failed: {str(e)}", "isError": True})
+        except subprocess.TimeoutExpired:
+            return jsonify({"output": "Execution timed out.", "isError": True})
+        except FileNotFoundError as e:
+            cmd_name = e.filename if e.filename else (compile_cmd[0] if compile_cmd else cmd[0])
+            return jsonify({"output": f"Error: Command '{cmd_name}' not found. Please ensure it is installed and in your system PATH.", "isError": True})
+        except Exception as e:
+            return jsonify({"output": f"Execution error: {str(e)}", "isError": True})
 
 @socketio.on('join_room')
 def handle_join(data):
@@ -131,15 +149,19 @@ def handle_join(data):
     # Register this user's SID (Session ID)
     rooms[room]['users'][request.sid] = username
     
+    user_list = list(rooms[room]['users'].values())
+    
     # Send the current state of the code and user count ONLY to the user who joined
     emit('joined', {
         'code': rooms[room]['code'], 
-        'userCount': len(rooms[room]['users'])
+        'userCount': len(user_list),
+        'users': user_list
     })
     
     # Broadcast to EVERYONE in the room that the user count has changed
     emit('presence_update', {
-        'userCount': len(rooms[room]['users'])
+        'userCount': len(user_list),
+        'users': user_list
     }, room=room)
 
 @socketio.on('code_change')
@@ -175,8 +197,10 @@ def handle_disconnect():
             # Remove user from tracking
             del room_data['users'][request.sid]
             # Notify remaining users of the new count
+            user_list = list(room_data['users'].values())
             emit('presence_update', {
-                'userCount': len(room_data['users'])
+                'userCount': len(user_list),
+                'users': user_list
             }, room=room_id)
             
             # Optional: Clean up empty rooms to save memory
