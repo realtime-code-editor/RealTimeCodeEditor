@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyncCode | Room {{ room }}</title>
+    <!-- Use vanilla CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+</head>
+<body class="editor-page">
+    <div class="topbar glass-card">
+        <div class="brand-mini">
+            <div class="logo-icon mini">{' '}</div>
+            <span>SyncCode</span>
+        </div>
+        
+        <div class="room-info">
+            <span class="label">Space:</span>
+            <span class="value">{{ room }}</span>
+        </div>
+        
+        <div class="execution-controls">
+            <select id="language-selector" class="lang-select">
+                <option value="python">Python</option>
+                <option value="javascript">JavaScript</option>
+                <option value="c">C</option>
+                <option value="c++">C++</option>
+                <option value="java">Java</option>
+            </select>
+            <button id="run-btn" class="run-btn">
+                <span class="icon">▶</span> Run Code
+            </button>
+        </div>
+        
+        <div class="user-info">
+            <div class="presence-indicator">
+                <span class="status-pulse"></span>
+                <span id="user-count">1</span> <span class="label">online</span>
+            </div>
+            <div class="username-badge">
+                <span class="user-avatar" id="avatar">{{ username[0] | upper }}</span>
+                {{ username }}
+            </div>
+        </div>
+    </div>
+    
+    <div id="editor-container" class="glass-card">
+        <!-- Monaco Editor mounted here via JS -->
+    </div>
+
+    <div class="output-panel glass-card">
+        <div class="io-container">
+            <div class="stdin-section">
+                <div class="output-header">
+                    <span>Standard Input</span>
+                </div>
+                <textarea id="stdin-input" placeholder="Enter input here..." spellcheck="false"></textarea>
+            </div>
+            <div class="stdout-section">
+                <div class="output-header">
+                    <span>Terminal Output</span>
+                    <button id="clear-btn" class="clear-btn">Clear</button>
+                </div>
+                <pre id="output-console">Waiting for execution...</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden state inputs for JavaScript to pick up -->
+    <input type="hidden" id="current-username" value="{{ username }}">
+    <input type="hidden" id="current-room" value="{{ room }}">
+
+    <!-- Socket.IO Client via CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    
+    <!-- Monaco Editor Scripts via CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.38.0/min/vs/loader.min.js"></script>
+    
+    <!-- Our custom logic -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

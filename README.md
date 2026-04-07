@@ -1,46 +1,50 @@
-# CodeSync: Real-Time Collaborative Code Editor
+# Real-Time Collaborative Code Editor
 
-A real-time collaborative code editing environment built with React, Vite, Monaco Editor, and Socket.IO.
-
-## Getting Started
-
-To run the full application locally, you will need to start both the backend server and the frontend client in separate terminal windows.
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) (v18 or higher recommended)
-- npm
-
-### 1. Start the Backend Server
-
-The Node.js/Socket.IO backend handles room management, active connections, and broadcasting code and cursor updates to users.
-
-Open a terminal window and navigate to the `server` directory:
-
-```sh
-cd server
-npm install
-npm run dev
-```
-
-The server will start (typically on port 3000) and watch for changes.
-
-### 2. Start the Frontend Client
-
-The Vite React application provides the user interface powered by Monaco Editor.
-
-Open a **new** terminal window at the root of the project:
-
-```sh
-npm install
-npm run dev
-```
-
-The terminal will output a local URL (e.g., `http://localhost:5173`). Open this URL in your browser to access the application.
+A real-time collaborative code editor built with Python, Flask, Flask-SocketIO, and Vanilla JS/CSS. It supports real-time synchronized coding sessions and multi-language code execution via the Judge0 API.
 
 ## Features
+- Real-time collaborative code editing across connected clients.
+- Multi-language support (Python, JavaScript, C, C++).
+- In-browser code execution using the Judge0 API.
+- Synchronized code execution output and state updates via WebSockets.
 
-- **Real-Time Editing:** Edit code synchronously with other participants in the same room.
-- **Robust Socket Connection:** Graceful connection fallback and state persistence.
-- **Monaco Editor Integration:** Full syntax highlighting and editor functionality using `@monaco-editor/react`.
-- **Modern UI:** Built using Framer Motion for animations and Tailwind CSS for styling.
+## Prerequisites
+- Python 3.8+
+- [RapidAPI](https://rapidapi.com/) account for Judge0 API access
+
+## Environment Setup
+
+1. Navigate to the project directory.
+2. Form a Python virtual environment and activate it:
+   
+   **Windows:**
+   ```bash
+
+   venv\Scripts\activate
+   ```
+   
+   **macOS/Linux:**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+3. Install the required dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. The application expects a `.env` file in the root directory with your Judge0 API key:
+   ```env
+   RAPIDAPI_KEY=your_rapidapi_key_here
+   ```
+   *You can subscribe to the free tier of the [Judge0 CE API](https://rapidapi.com/judge0-official/api/judge0-ce) on RapidAPI to obtain your key.*
+
+## Running the Server
+
+1. Ensure your virtual environment is activated.
+2. Start the application:
+   ```bash
+   python app.py
+   ```
+3. The server will start on port 5000. Open your web browser and navigate to `http://127.0.0.1:5000` to join or create a session.

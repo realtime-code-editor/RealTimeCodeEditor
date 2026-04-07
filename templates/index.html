@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Editor</title>
+    <!-- Use vanilla CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Load modern typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body class="join-page">
+    <div class="glass-card join-container">
+        <div class="brand">
+            <div class="logo-icon">{' '}</div>
+            <h1>SyncCode</h1>
+        </div>
+        <p class="subtitle">Join a room to start collaborating instantly.</p>
+        
+        <form id="join-form" action="/editor" method="GET">
+            <div class="input-group">
+                <input type="text" id="username" name="username" placeholder="Your Username" required autocomplete="off">
+            </div>
+            <div class="input-group">
+                <input type="text" id="room" name="room" placeholder="Room ID (e.g. dev-123)" required autocomplete="off">
+            </div>
+            <button type="submit" class="primary-btn">Join Editor</button>
+        </form>
+    </div>
+</body>
+</html>
