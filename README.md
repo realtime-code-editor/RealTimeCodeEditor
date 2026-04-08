@@ -3,6 +3,7 @@
 A real-time collaborative code editor built with Python, Flask, Flask-SocketIO, and Vanilla JS/CSS. It supports real-time synchronized coding sessions and multi-language code execution via the Judge0 API.
 
 ## Features
+- Secure login/signup authentication before accessing rooms.
 - Real-time collaborative code editing across connected clients.
 - Multi-language support (Python, JavaScript, C, C++).
 - In-browser code execution using the Judge0 API.

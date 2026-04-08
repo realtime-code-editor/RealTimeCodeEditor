@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyncCode | Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body class="join-page">
+    <div class="glass-card join-container">
+        <div class="brand">
+            <div class="logo-icon">{' '}</div>
+            <h1>SyncCode</h1>
+        </div>
+        <p class="subtitle">Welcome back, <strong>{{ username }}</strong>. Create a new room or join an existing one.</p>
+
+        <div class="tabs-header">
+            <button class="tab-btn active" id="tab-create">Create Room</button>
+            <button class="tab-btn" id="tab-join">Join Room</button>
+        </div>
+
+        <form id="create-form" action="/create-room" method="POST" class="tab-content active">
+            <button type="submit" class="primary-btn">Create New Room</button>
+        </form>
+
+        <form id="join-form" action="/editor" method="GET" class="tab-content">
+            <div class="input-group">
+                <input type="text" id="join-room" name="room" placeholder="Room ID (e.g. QBPNNN)" required autocomplete="off">
+            </div>
+            <button type="submit" class="primary-btn secondary">Join Room</button>
+        </form>
+
+        <div class="footer-row">
+            <p class="subtitle">Not you? <a href="{{ url_for('logout') }}">Logout</a></p>
+        </div>
+    </div>
+
+    <script>
+        const tabCreate = document.getElementById('tab-create');
+        const tabJoin = document.getElementById('tab-join');
+        const formCreate = document.getElementById('create-form');
+        const formJoin = document.getElementById('join-form');
+
+        tabCreate.addEventListener('click', () => {
+            tabCreate.classList.add('active');
+            tabJoin.classList.remove('active');
+            formCreate.classList.add('active');
+            formJoin.classList.remove('active');
+        });
+
+        tabJoin.addEventListener('click', () => {
+            tabJoin.classList.add('active');
+            tabCreate.classList.remove('active');
+            formJoin.classList.add('active');
+            formCreate.classList.remove('active');
+        });
+    </script>
+</body>
+</html>

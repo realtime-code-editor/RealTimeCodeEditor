@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash
 from flask_socketio import SocketIO, join_room, leave_room, emit
 import requests
 import os
@@ -6,6 +6,8 @@ import random
 import string
 import subprocess
 import tempfile
+import sqlite3
+import functools
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,37 +17,155 @@ app.config['SECRET_KEY'] = 'realtime-editor-super-secret'
 # Using eventlet for better WebSocket performance if available
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+DB_PATH = os.path.join(os.path.dirname(__file__), 'users.db')
+
 # State structure to hold room data: dict mapping room_id -> {'code': string, 'users': dict of sid -> username}
 rooms = {}
 
 
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    with get_db() as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
+init_db()
+
+
+def create_user(username, password):
+    from werkzeug.security import generate_password_hash
+    password_hash = generate_password_hash(password)
+    try:
+        with get_db() as conn:
+            conn.execute(
+                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+                (username, password_hash)
+            )
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+
+def authenticate_user(username, password):
+    from werkzeug.security import check_password_hash
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE username = ?",
+            (username,)
+        ).fetchone()
+    if row and check_password_hash(row['password_hash'], password):
+        return row['id']
+    return None
+
+
+def login_required(view):
+    @functools.wraps(view)
+    def wrapped_view(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        return view(*args, **kwargs)
+    return wrapped_view
+
 
 @app.route('/')
 def index():
-    """Renders the join room page."""
-    return render_template('index.html')
+    if session.get('user_id'):
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
+
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if session.get('user_id'):
+        return redirect(url_for('dashboard'))
+
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        confirm_password = request.form.get('confirm_password', '').strip()
+
+        if not username or not password or not confirm_password:
+            error = 'All fields are required.'
+        elif password != confirm_password:
+            error = 'Passwords do not match.'
+        elif not create_user(username, password):
+            error = 'Username already exists.'
+        else:
+            flash('Account created successfully. Please log in.')
+            return redirect(url_for('login'))
+
+    return render_template('index.html', action='signup', error=error)
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if session.get('user_id'):
+        return redirect(url_for('dashboard'))
+
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+
+        if not username or not password:
+            error = 'Username and password are required.'
+        else:
+            user_id = authenticate_user(username, password)
+            if user_id:
+                session.clear()
+                session['user_id'] = user_id
+                session['username'] = username
+                return redirect(url_for('dashboard'))
+            error = 'Invalid username or password.'
+
+    return render_template('index.html', action='login', error=error)
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    return render_template('dashboard.html', username=session['username'])
+
 
 @app.route('/create-room', methods=['POST'])
+@login_required
 def create_room():
-    """Creates a new room with an auto-generated code."""
-    username = request.form.get('username')
-    if not username:
-        return redirect(url_for('index'))
     room_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-    return redirect(url_for('editor', username=username, room=room_code))
+    return redirect(url_for('editor', room=room_code))
+
 
 @app.route('/editor')
+@login_required
 def editor():
-    """Renders the editor page if username and room are provided."""
-    username = request.args.get('username')
     room = request.args.get('room')
-    
-    if not username or not room:
-        return redirect(url_for('index'))
-        
-    return render_template('editor.html', username=username, room=room)
+    if not room:
+        return redirect(url_for('dashboard'))
+
+    return render_template('editor.html', username=session['username'], room=room)
+
 
 @app.route('/run', methods=['POST'])
+@login_required
 def run_code():
     """Endpoint to execute code via Judge0 API."""
     data = request.json

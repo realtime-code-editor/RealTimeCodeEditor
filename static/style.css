@@ -108,6 +108,28 @@ body {
     letter-spacing: 0.5px;
 }
 
+.error-box,
+.success-box {
+    width: 100%;
+    text-align: left;
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+}
+
+.error-box {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #fecaca;
+}
+
+.success-box {
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    color: #a7f3d0;
+}
+
 .input-group {
     margin-bottom: 1.5rem;
     position: relative;
@@ -199,6 +221,10 @@ body {
 
 .tab-content.active {
     display: block;
+}
+
+.footer-row {
+    margin-top: 1.75rem;
 }
 
 .primary-btn.secondary {

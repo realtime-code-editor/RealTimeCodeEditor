@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Editor</title>
-    <!-- Use vanilla CSS -->
+    <title>SyncCode | Login</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <!-- Load modern typography -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 </head>
 <body class="join-page">
@@ -15,51 +13,66 @@
             <div class="logo-icon">{' '}</div>
             <h1>SyncCode</h1>
         </div>
-        <p class="subtitle">Join or create a room to start collaborating instantly.</p>
-        
+        <p class="subtitle">Secure collaboration starts with an account.</p>
+
         <div class="tabs-header">
-            <button class="tab-btn active" id="tab-create">Create Room</button>
-            <button class="tab-btn" id="tab-join">Join Room</button>
+            <button class="tab-btn {{ 'active' if action != 'signup' else '' }}" id="tab-login">Login</button>
+            <button class="tab-btn {{ 'active' if action == 'signup' else '' }}" id="tab-signup">Signup</button>
         </div>
 
-        <!-- Form for Creating a Room -->
-        <form id="create-form" action="/create-room" method="POST" class="tab-content active">
+        {% if error %}
+            <div class="error-box">{{ error }}</div>
+        {% endif %}
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="success-box">
+                    {{ messages[0] }}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form id="login-form" action="/login" method="POST" class="tab-content {{ 'active' if action != 'signup' else '' }}">
             <div class="input-group">
-                <input type="text" id="create-username" name="username" placeholder="Your Username" required autocomplete="off">
+                <input type="text" name="username" placeholder="Username" required autocomplete="off">
             </div>
-            <button type="submit" class="primary-btn">Create New Room</button>
+            <div class="input-group">
+                <input type="password" name="password" placeholder="Password" required autocomplete="off">
+            </div>
+            <button type="submit" class="primary-btn">Login</button>
         </form>
-        
-        <!-- Form for Joining an Existing Room -->
-        <form id="join-form" action="/editor" method="GET" class="tab-content">
+
+        <form id="signup-form" action="/signup" method="POST" class="tab-content {{ 'active' if action == 'signup' else '' }}">
             <div class="input-group">
-                <input type="text" id="join-username" name="username" placeholder="Your Username" required autocomplete="off">
+                <input type="text" name="username" placeholder="Choose a Username" required autocomplete="off">
             </div>
             <div class="input-group">
-                <input type="text" id="join-room" name="room" placeholder="Room ID (e.g. QBPNNN)" required autocomplete="off">
+                <input type="password" name="password" placeholder="Password" required autocomplete="off">
             </div>
-            <button type="submit" class="primary-btn secondary">Join Room</button>
+            <div class="input-group">
+                <input type="password" name="confirm_password" placeholder="Confirm Password" required autocomplete="off">
+            </div>
+            <button type="submit" class="primary-btn secondary">Signup</button>
         </form>
     </div>
 
     <script>
-        const tabCreate = document.getElementById('tab-create');
-        const tabJoin = document.getElementById('tab-join');
-        const formCreate = document.getElementById('create-form');
-        const formJoin = document.getElementById('join-form');
+        const tabLogin = document.getElementById('tab-login');
+        const tabSignup = document.getElementById('tab-signup');
+        const loginForm = document.getElementById('login-form');
+        const signupForm = document.getElementById('signup-form');
 
-        tabCreate.addEventListener('click', () => {
-            tabCreate.classList.add('active');
-            tabJoin.classList.remove('active');
-            formCreate.classList.add('active');
-            formJoin.classList.remove('active');
+        tabLogin.addEventListener('click', () => {
+            tabLogin.classList.add('active');
+            tabSignup.classList.remove('active');
+            loginForm.classList.add('active');
+            signupForm.classList.remove('active');
         });
 
-        tabJoin.addEventListener('click', () => {
-            tabJoin.classList.add('active');
-            tabCreate.classList.remove('active');
-            formJoin.classList.add('active');
-            formCreate.classList.remove('active');
+        tabSignup.addEventListener('click', () => {
+            tabSignup.classList.add('active');
+            tabLogin.classList.remove('active');
+            signupForm.classList.add('active');
+            loginForm.classList.remove('active');
         });
     </script>
 </body>
