@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 import sqlite3
 import functools
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -29,6 +30,15 @@ def get_db():
     return conn
 
 
+def ensure_column(conn, table, column_name, column_type, default=None):
+    columns = [row['name'] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+    if column_name not in columns:
+        sql = f"ALTER TABLE {table} ADD COLUMN {column_name} {column_type}"
+        if default is not None:
+            sql += f" DEFAULT {default}"
+        conn.execute(sql)
+
+
 def init_db():
     with get_db() as conn:
         conn.execute(
@@ -37,9 +47,33 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TEXT DEFAULT (date('now'))
             )
             """
+        )
+        columns = [row['name'] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if 'last_login_at' not in columns:
+            conn.execute("ALTER TABLE users ADD COLUMN last_login_at TEXT")
+        if 'last_logout_at' in columns:
+            conn.execute("ALTER TABLE users RENAME TO users_old")
+            conn.execute(
+                """
+                CREATE TABLE users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    created_at TEXT DEFAULT (date('now')),
+                    last_login_at TEXT
+                )
+                """
+            )
+            conn.execute(
+                "INSERT INTO users (id, username, password_hash, created_at, last_login_at)"
+                " SELECT id, username, password_hash, created_at, last_login_at FROM users_old"
+            )
+            conn.execute("DROP TABLE users_old")
+        conn.execute(
+            "UPDATE users SET created_at = substr(created_at, 1, 10) WHERE created_at LIKE '% %'"
         )
 
 init_db()
@@ -48,11 +82,12 @@ init_db()
 def create_user(username, password):
     from werkzeug.security import generate_password_hash
     password_hash = generate_password_hash(password)
+    created_at = datetime.utcnow().strftime('%Y-%m-%d')
     try:
         with get_db() as conn:
             conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash)
+                "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
+                (username, password_hash, created_at)
             )
         return True
     except sqlite3.IntegrityError:
@@ -69,6 +104,34 @@ def authenticate_user(username, password):
     if row and check_password_hash(row['password_hash'], password):
         return row['id']
     return None
+
+
+def record_login_time(user_id):
+    if not user_id:
+        return
+    timestamp = datetime.utcnow().strftime('%Y-%m-%d')
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE users SET last_login_at = ? WHERE id = ?",
+            (timestamp, user_id)
+        )
+
+
+def get_user_activity(user_id):
+    with get_db() as conn:
+        return conn.execute(
+            "SELECT last_login_at FROM users WHERE id = ?",
+            (user_id,)
+        ).fetchone()
+
+
+def format_date(timestamp):
+    if not timestamp:
+        return None
+    try:
+        return timestamp.split(' ')[0]
+    except Exception:
+        return timestamp
 
 
 def login_required(view):
@@ -129,6 +192,7 @@ def login():
                 session.clear()
                 session['user_id'] = user_id
                 session['username'] = username
+                record_login_time(user_id)
                 return redirect(url_for('dashboard'))
             error = 'Invalid username or password.'
 
@@ -144,7 +208,12 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template('dashboard.html', username=session['username'])
+    activity = get_user_activity(session['user_id'])
+    return render_template(
+        'dashboard.html',
+        username=session['username'],
+        last_login_at=format_date(activity['last_login_at'])
+    )
 
 
 @app.route('/create-room', methods=['POST'])
