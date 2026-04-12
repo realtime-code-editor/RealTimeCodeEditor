@@ -12,6 +12,13 @@
         <div class="brand">
             <div class="logo-icon">{' '}</div>
             <h1>SyncCode</h1>
+            <button id="theme-toggle" class="theme-toggle" title="Toggle Theme">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+                </svg>
+                <span id="theme-label">Dark</span>
+            </button>
         </div>
         <p class="subtitle">Welcome back, <strong>{{ username }}</strong>. Create a new room or join an existing one.</p>
         <p class="subtitle">Last login date: <strong>{{ last_login_at or 'N/A' }}</strong></p>
@@ -56,6 +63,27 @@
             formJoin.classList.add('active');
             formCreate.classList.remove('active');
         });
+
+        // Theme toggle functionality
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeLabel = document.getElementById('theme-label');
+        if (themeToggle && themeLabel) {
+            // Load saved theme
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'light') {
+                document.body.classList.add('light-mode');
+                themeLabel.textContent = 'Light';
+            } else {
+                themeLabel.textContent = 'Dark';
+            }
+
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('light-mode');
+                const isLight = document.body.classList.contains('light-mode');
+                localStorage.setItem('theme', isLight ? 'light' : 'dark');
+                themeLabel.textContent = isLight ? 'Light' : 'Dark';
+            });
+        }
     </script>
 </body>
 </html>

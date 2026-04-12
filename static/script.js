@@ -26,7 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
             usersDropdown.appendChild(el);
         });
     }
-    
+
     if (copyRoomBtn) {
         copyRoomBtn.addEventListener("click", () => {
             navigator.clipboard.writeText(room).then(() => {
@@ -60,9 +60,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // ==========================================
     // 2. Setup Monaco Editor via CDN
     // ==========================================
-    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.38.0/min/vs' }});
-    require(['vs/editor/editor.main'], function() {
-        
+    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.38.0/min/vs' } });
+    require(['vs/editor/editor.main'], function () {
+
         // Custom Theme to match our premium UI
         monaco.editor.defineTheme('syncCodeTheme', {
             base: 'vs-dark',
@@ -71,6 +71,17 @@ document.addEventListener("DOMContentLoaded", () => {
             colors: {
                 'editor.background': '#11182700', // transparent to let glassmorphism show
                 'editor.lineHighlightBackground': '#1e293b88',
+                'editorLineNumber.foreground': '#64748b',
+            }
+        });
+
+        monaco.editor.defineTheme('syncCodeThemeLight', {
+            base: 'vs',
+            inherit: true,
+            rules: [],
+            colors: {
+                'editor.background': '#ffffff00', // transparent
+                'editor.lineHighlightBackground': '#f1f5f988',
                 'editorLineNumber.foreground': '#64748b',
             }
         });
@@ -90,19 +101,31 @@ document.addEventListener("DOMContentLoaded", () => {
             cursorSmoothCaretAnimation: true
         });
 
-        // Apply our true theme once it's loaded
-        monaco.editor.setTheme('syncCodeTheme');
+        // Function to update editor theme
+        function updateEditorTheme() {
+            if (document.body.classList.contains('light-mode')) {
+                monaco.editor.setTheme('syncCodeThemeLight');
+            } else {
+                monaco.editor.setTheme('syncCodeTheme');
+            }
+        }
+
+        // Make it global
+        window.updateEditorTheme = updateEditorTheme;
+
+        // Apply initial theme
+        updateEditorTheme();
 
         // Once editor is ready, setup WebSockets
         setupWebSockets();
-        
+
         // Listen to local typing events
         editor.onDidChangeModelContent((e) => {
             // Ignore the event if the write came from the server
             if (isUpdatingFromServer) return;
-            
+
             const currentCode = editor.getValue();
-            
+
             // Broadcast changes to the room
             socket.emit("code_change", {
                 room: room,
@@ -134,7 +157,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const language = langSelector.value;
             const stdin = stdinInput.value;
-            
+
             runBtn.disabled = true;
             runBtn.innerHTML = '<span class="icon">⌛</span> Running...';
             outputConsole.textContent = 'Executing remotely...';
@@ -146,24 +169,24 @@ document.addEventListener("DOMContentLoaded", () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ code, language, stdin })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.isError) {
                     outputConsole.classList.add("error-text");
                 } else {
                     outputConsole.classList.remove("error-text");
                 }
-                
+
                 outputConsole.textContent = data.output || "Program finished with no output.";
-                
+
                 // Broadcast the output to all peers in the room
                 socket.emit("run_output", {
                     room: room,
                     output: outputConsole.textContent,
                     isError: !!data.isError
                 });
-                
+
             } catch (err) {
                 console.error(err);
                 outputConsole.classList.add("error-text");
@@ -191,11 +214,11 @@ document.addEventListener("DOMContentLoaded", () => {
         // Handle successful join and receive existing code state
         socket.on("joined", (data) => {
             console.log("Joined successfully. Initializing code state.");
-            
+
             isUpdatingFromServer = true;
             editor.setValue(data.code);
             isUpdatingFromServer = false;
-            
+
             userCountEl.innerText = data.userCount;
             updateUsersDropdown(data.users);
         });
@@ -203,30 +226,30 @@ document.addEventListener("DOMContentLoaded", () => {
         // Handle incoming live updates from other users
         socket.on("code_update", (data) => {
             if (!editor) return;
-            
+
             isUpdatingFromServer = true;
-            
+
             // Note: In a production tool (like real Google Docs), we would use Operational Transformation (OT)
             // or CRDTs. For this MVP, we override the whole value but preserve the local user's cursor.
             const position = editor.getPosition();
-            
+
             editor.setValue(data.code);
-            
+
             editor.setPosition(position);
-            
+
             isUpdatingFromServer = false;
         });
 
         // Handle presence
         socket.on("presence_update", (data) => {
             userCountEl.innerText = data.userCount;
-            
+
             // Trigger a quick pulse effect on the counter for visual feedback
             userCountEl.style.color = 'var(--success)';
             setTimeout(() => {
                 userCountEl.style.color = '';
             }, 300);
-            
+
             updateUsersDropdown(data.users);
         });
 
@@ -238,7 +261,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 outputConsole.classList.remove("error-text");
             }
             outputConsole.textContent = data.output;
-            
+
             // Optional: scroll to bottom
             outputConsole.scrollTop = outputConsole.scrollHeight;
         });
