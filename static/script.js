@@ -6,25 +6,56 @@ document.addEventListener("DOMContentLoaded", () => {
     // Get metadata injected by Flask
     const username = document.getElementById("current-username").value;
     const room = document.getElementById("current-room").value;
-    const userCountEl = document.getElementById("user-count");
+    const participantCountEl = document.getElementById("participant-count");
 
     const langSelector = document.getElementById("language-selector");
     const runBtn = document.getElementById("run-btn");
     const outputConsole = document.getElementById("output-console");
     const clearBtn = document.getElementById("clear-btn");
     const stdinInput = document.getElementById("stdin-input");
-    const usersDropdown = document.getElementById("users-dropdown");
+    const participantsList = document.getElementById("participants-list");
+    const participantsToggle = document.getElementById("participants-toggle");
+    const participantsSidebar = document.getElementById("participants-sidebar");
+    const sidebarBackdrop = document.getElementById("sidebar-backdrop");
+    const closeParticipantsBtn = document.getElementById("close-participants");
     const copyRoomBtn = document.getElementById("copy-room-btn");
 
-    function updateUsersDropdown(users) {
-        if (!usersDropdown || !users) return;
-        usersDropdown.innerHTML = '';
-        users.forEach(u => {
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeLabel = document.getElementById('theme-label');
+
+    function updateParticipantsList(users) {
+        if (!participantsList || !users) return;
+        participantsList.innerHTML = '';
+
+        const sortedUsers = [...users].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+        participantCountEl.textContent = sortedUsers.length;
+
+        sortedUsers.forEach(u => {
             const el = document.createElement('div');
-            el.className = 'user-item';
-            el.innerHTML = `<span class="dot"></span> ${u}`;
-            usersDropdown.appendChild(el);
+            el.className = 'participant-item';
+            el.innerHTML = `<span class="dot"></span> <span>${u}</span>`;
+            participantsList.appendChild(el);
         });
+    }
+
+    function toggleParticipantsSidebar(open) {
+        const isOpen = typeof open === 'boolean' ? open : !participantsSidebar.classList.contains('open');
+        participantsSidebar.classList.toggle('open', isOpen);
+        sidebarBackdrop.classList.toggle('visible', isOpen);
+        participantsSidebar.setAttribute('aria-hidden', !isOpen);
+    }
+
+    if (participantsToggle) {
+        participantsToggle.addEventListener('click', () => toggleParticipantsSidebar(true));
+    }
+
+    if (closeParticipantsBtn) {
+        closeParticipantsBtn.addEventListener('click', () => toggleParticipantsSidebar(false));
+    }
+
+    if (sidebarBackdrop) {
+        sidebarBackdrop.addEventListener('click', () => toggleParticipantsSidebar(false));
     }
 
     if (copyRoomBtn) {
@@ -115,6 +146,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Apply initial theme
         updateEditorTheme();
+
+        // Attach theme toggle event listener
+        if (themeToggle && themeLabel) {
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('light-mode');
+                const isLight = document.body.classList.contains('light-mode');
+                localStorage.setItem('theme', isLight ? 'light' : 'dark');
+                themeLabel.textContent = isLight ? 'Light' : 'Dark';
+                updateEditorTheme();
+            });
+        }
 
         // Once editor is ready, setup WebSockets
         setupWebSockets();
@@ -219,8 +261,7 @@ document.addEventListener("DOMContentLoaded", () => {
             editor.setValue(data.code);
             isUpdatingFromServer = false;
 
-            userCountEl.innerText = data.userCount;
-            updateUsersDropdown(data.users);
+            updateParticipantsList(data.users);
         });
 
         // Handle incoming live updates from other users
@@ -242,15 +283,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Handle presence
         socket.on("presence_update", (data) => {
-            userCountEl.innerText = data.userCount;
+            updateParticipantsList(data.users);
 
-            // Trigger a quick pulse effect on the counter for visual feedback
-            userCountEl.style.color = 'var(--success)';
-            setTimeout(() => {
-                userCountEl.style.color = '';
-            }, 300);
-
-            updateUsersDropdown(data.users);
+            if (participantCountEl) {
+                participantCountEl.style.color = 'var(--success)';
+                setTimeout(() => {
+                    participantCountEl.style.color = '';
+                }, 300);
+            }
         });
 
         // Handle execution output sync

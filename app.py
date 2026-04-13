@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash, g
 from flask_socketio import SocketIO, join_room, leave_room, emit
 import requests
 import os
@@ -22,6 +22,10 @@ DB_PATH = os.path.join(os.path.dirname(__file__), 'users.db')
 
 # State structure to hold room data: dict mapping room_id -> {'code': string, 'users': dict of sid -> username}
 rooms = {}
+
+
+def get_tab_id():
+    return request.values.get('tab', 'default')
 
 
 def get_db():
@@ -137,23 +141,31 @@ def format_date(timestamp):
 def login_required(view):
     @functools.wraps(view)
     def wrapped_view(*args, **kwargs):
-        if 'user_id' not in session:
-            return redirect(url_for('login'))
+        tab_id = get_tab_id()
+        tabs = session.get('tabs', {})
+        tab_data = tabs.get(tab_id)
+        if not tab_data:
+            return redirect(url_for('login', tab=tab_id))
+
+        g.tab_id = tab_id
+        g.tab_user_id = tab_data['user_id']
+        g.tab_username = tab_data['username']
         return view(*args, **kwargs)
     return wrapped_view
 
 
 @app.route('/')
 def index():
-    if session.get('user_id'):
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
+    tab_id = get_tab_id()
+    return render_template('index.html', action='login', tab=tab_id)
 
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
-    if session.get('user_id'):
-        return redirect(url_for('dashboard'))
+    tab_id = get_tab_id()
+    tabs = session.get('tabs', {})
+    if tabs.get(tab_id):
+        return redirect(url_for('dashboard', tab=tab_id))
 
     error = None
     if request.method == 'POST':
@@ -169,15 +181,17 @@ def signup():
             error = 'Username already exists.'
         else:
             flash('Account created successfully. Please log in.')
-            return redirect(url_for('login'))
+            return redirect(url_for('login', tab=tab_id))
 
-    return render_template('index.html', action='signup', error=error)
+    return render_template('index.html', action='signup', error=error, tab=tab_id)
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if session.get('user_id'):
-        return redirect(url_for('dashboard'))
+    tab_id = get_tab_id()
+    tabs = session.get('tabs', {})
+    if tabs.get(tab_id):
+        return redirect(url_for('dashboard', tab=tab_id))
 
     error = None
     if request.method == 'POST':
@@ -189,30 +203,37 @@ def login():
         else:
             user_id = authenticate_user(username, password)
             if user_id:
-                session.clear()
-                session['user_id'] = user_id
-                session['username'] = username
+                tabs[tab_id] = {'user_id': user_id, 'username': username}
+                session['tabs'] = tabs
                 record_login_time(user_id)
-                return redirect(url_for('dashboard'))
+                return redirect(url_for('dashboard', tab=tab_id))
             error = 'Invalid username or password.'
 
-    return render_template('index.html', action='login', error=error)
+    return render_template('index.html', action='login', error=error, tab=tab_id)
 
 
 @app.route('/logout')
 def logout():
-    session.clear()
-    return redirect(url_for('login'))
+    tab_id = get_tab_id()
+    tabs = session.get('tabs', {})
+    if tab_id in tabs:
+        tabs.pop(tab_id)
+        if tabs:
+            session['tabs'] = tabs
+        else:
+            session.clear()
+    return redirect(url_for('login', tab=tab_id))
 
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    activity = get_user_activity(session['user_id'])
+    activity = get_user_activity(g.tab_user_id)
     return render_template(
         'dashboard.html',
-        username=session['username'],
-        last_login_at=format_date(activity['last_login_at'])
+        username=g.tab_username,
+        last_login_at=format_date(activity['last_login_at']),
+        tab=g.tab_id
     )
 
 
@@ -220,7 +241,7 @@ def dashboard():
 @login_required
 def create_room():
     room_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-    return redirect(url_for('editor', room=room_code))
+    return redirect(url_for('editor', room=room_code, tab=g.tab_id))
 
 
 @app.route('/editor')
@@ -228,9 +249,9 @@ def create_room():
 def editor():
     room = request.args.get('room')
     if not room:
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('dashboard', tab=g.tab_id))
 
-    return render_template('editor.html', username=session['username'], room=room)
+    return render_template('editor.html', username=g.tab_username, room=room, tab=g.tab_id)
 
 
 @app.route('/run', methods=['POST'])

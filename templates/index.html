@@ -45,6 +45,7 @@
             <div class="input-group">
                 <input type="password" name="password" placeholder="Password" required autocomplete="off">
             </div>
+            <input type="hidden" name="tab" value="{{ tab }}">
             <button type="submit" class="primary-btn">Login</button>
         </form>
 
@@ -58,6 +59,7 @@
             <div class="input-group">
                 <input type="password" name="confirm_password" placeholder="Confirm Password" required autocomplete="off">
             </div>
+            <input type="hidden" name="tab" value="{{ tab }}">
             <button type="submit" class="primary-btn secondary">Signup</button>
         </form>
     </div>
@@ -102,6 +104,48 @@
                 themeLabel.textContent = isLight ? 'Light' : 'Dark';
             });
         }
+
+        (function() {
+            const storageKey = 'synccode_tab_id';
+            let tabId = sessionStorage.getItem(storageKey);
+            if (!tabId) {
+                tabId = crypto.randomUUID ? crypto.randomUUID() : 'tab-' + Math.random().toString(36).slice(2, 12);
+                sessionStorage.setItem(storageKey, tabId);
+            }
+
+            const currentUrl = new URL(window.location.href);
+            if (!currentUrl.searchParams.get('tab')) {
+                currentUrl.searchParams.set('tab', tabId);
+                window.history.replaceState(null, '', currentUrl.toString());
+            } else {
+                tabId = currentUrl.searchParams.get('tab');
+                sessionStorage.setItem(storageKey, tabId);
+            }
+
+            document.querySelectorAll('form').forEach(form => {
+                let tabInput = form.querySelector('input[name="tab"]');
+                if (!tabInput) {
+                    tabInput = document.createElement('input');
+                    tabInput.type = 'hidden';
+                    tabInput.name = 'tab';
+                    form.appendChild(tabInput);
+                }
+                tabInput.value = tabId;
+            });
+
+            document.querySelectorAll('a[href]').forEach(link => {
+                const href = link.getAttribute('href');
+                if (!href || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+                try {
+                    const linkUrl = new URL(href, window.location.origin);
+                    if (linkUrl.origin !== window.location.origin) return;
+                    linkUrl.searchParams.set('tab', tabId);
+                    link.setAttribute('href', linkUrl.pathname + linkUrl.search + linkUrl.hash);
+                } catch (e) {
+                    // ignore malformed URLs
+                }
+            });
+        })();
     </script>
 </body>
 </html>

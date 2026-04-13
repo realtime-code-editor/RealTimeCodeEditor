@@ -44,18 +44,11 @@
         </div>
 
         <div class="user-info">
-            <div class="presence-indicator" title="Online users">
-                <span class="status-pulse"></span>
-                <span id="user-count">1</span> <span class="label">online</span>
-                <div class="users-dropdown" id="users-dropdown">
-                    <!-- Populated by JS -->
-                </div>
-            </div>
             <div class="username-badge">
                 <span class="user-avatar" id="avatar">{{ username[0] | upper }}</span>
                 {{ username }}
             </div>
-            <button id="theme-toggle" class="theme-toggle" title="Toggle Theme">
+            <button id="theme-toggle" class="theme-toggle" type="button" title="Toggle Theme">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="5"></circle>
@@ -65,7 +58,7 @@
                 </svg>
                 <span id="theme-label">Dark</span>
             </button>
-            <a href="{{ url_for('dashboard') }}" class="icon-btn leave-btn" title="Leave Room">
+            <a href="{{ url_for('dashboard', tab=tab) }}" class="icon-btn leave-btn" title="Leave Room">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -73,11 +66,40 @@
                     <line x1="21" y1="12" x2="9" y2="12"></line>
                 </svg>
             </a>
+            <button id="participants-toggle" class="icon-btn participants-toggle" title="Open participants sidebar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <span class="participant-count" id="participant-count">1</span>
+            </button>
         </div>
     </div>
 
-    <div id="editor-container" class="glass-card">
-        <!-- Monaco Editor mounted here via JS -->
+    <div class="editor-content-wrapper">
+        <div id="participants-sidebar" class="participants-sidebar" aria-hidden="true">
+            <div class="sidebar-header">
+                <span>Participants</span>
+                <button id="close-participants" class="icon-btn close-sidebar" title="Close participants sidebar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="participants-list" id="participants-list">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+        <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+        <div id="editor-container" class="glass-card">
+            <!-- Monaco Editor mounted here via JS -->
+        </div>
     </div>
 
     <div class="output-panel glass-card">
@@ -112,6 +134,7 @@
     <script src="{{ url_for('static', filename='script.js') }}"></script>
     <script>
         // Theme toggle functionality
+        window.updateEditorTheme = function() { };
         const themeToggle = document.getElementById('theme-toggle');
         const themeLabel = document.getElementById('theme-label');
         if (themeToggle && themeLabel) {
@@ -123,19 +146,37 @@
             } else {
                 themeLabel.textContent = 'Dark';
             }
+            // Event listener attached in script.js after Monaco loads
+        }
 
-            themeToggle.addEventListener('click', () => {
-                document.body.classList.toggle('light-mode');
-                const isLight = document.body.classList.contains('light-mode');
-                localStorage.setItem('theme', isLight ? 'light' : 'dark');
-                themeLabel.textContent = isLight ? 'Light' : 'Dark';
-                // Update editor theme if available
-                if (window.updateEditorTheme) {
-                    window.updateEditorTheme();
+        (function() {
+            const storageKey = 'synccode_tab_id';
+            let tabId = sessionStorage.getItem(storageKey);
+            if (!tabId) {
+                tabId = crypto.randomUUID ? crypto.randomUUID() : 'tab-' + Math.random().toString(36).slice(2, 12);
+                sessionStorage.setItem(storageKey, tabId);
+            }
+
+            const currentUrl = new URL(window.location.href);
+            if (!currentUrl.searchParams.get('tab')) {
+                currentUrl.searchParams.set('tab', tabId);
+                window.history.replaceState(null, '', currentUrl.toString());
+            } else {
+                tabId = currentUrl.searchParams.get('tab');
+                sessionStorage.setItem(storageKey, tabId);
+            }
+
+            document.querySelectorAll('a[href]').forEach(link => {
+                const href = link.getAttribute('href');
+                if (!href || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+                try {
+                    const linkUrl = new URL(href, window.location.origin);
+                    if (linkUrl.origin !== window.location.origin) return;
+                    linkUrl.searchParams.set('tab', tabId);
+                    link.setAttribute('href', linkUrl.pathname + linkUrl.search + linkUrl.hash);
+                } catch (e) {
+                    // ignore malformed URLs
                 }
             });
-        }
-    </script>
-</body>
-
+        })();
 </html>
