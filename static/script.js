@@ -20,6 +20,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const closeParticipantsBtn = document.getElementById("close-participants");
     const copyRoomBtn = document.getElementById("copy-room-btn");
 
+    const chatToggle = document.getElementById("chat-toggle");
+    const chatSidebar = document.getElementById("chat-sidebar");
+    const closeChatBtn = document.getElementById("close-chat");
+    const chatMessages = document.getElementById("chat-messages");
+    const chatInput = document.getElementById("chat-input");
+    const sendChatBtn = document.getElementById("send-chat-btn");
+    const chatBadge = document.getElementById("chat-badge");
+
     const themeToggle = document.getElementById('theme-toggle');
     const themeLabel = document.getElementById('theme-label');
 
@@ -27,11 +35,19 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!participantsList || !users) return;
         participantsList.innerHTML = '';
 
-        const sortedUsers = [...users].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+        const otherUsers = [...users].filter(u => u !== username).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+        const hasCurrentUser = [...users].includes(username);
 
-        participantCountEl.textContent = sortedUsers.length;
+        participantCountEl.textContent = users.length;
 
-        sortedUsers.forEach(u => {
+        if (hasCurrentUser) {
+            const el = document.createElement('div');
+            el.className = 'participant-item';
+            el.innerHTML = `<span class="dot"></span> <span>${username} (me)</span>`;
+            participantsList.appendChild(el);
+        }
+
+        otherUsers.forEach(u => {
             const el = document.createElement('div');
             el.className = 'participant-item';
             el.innerHTML = `<span class="dot"></span> <span>${u}</span>`;
@@ -39,23 +55,115 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    function toggleParticipantsSidebar(open) {
-        const isOpen = typeof open === 'boolean' ? open : !participantsSidebar.classList.contains('open');
-        participantsSidebar.classList.toggle('open', isOpen);
+    function toggleSidebar(sidebarId, open) {
+        const sidebar = document.getElementById(sidebarId);
+        if (!sidebar) return;
+        const isOpen = typeof open === 'boolean' ? open : !sidebar.classList.contains('open');
+        
+        // Close all other sidebars first
+        if (isOpen) {
+            document.querySelectorAll('.sidebar-component').forEach(el => {
+                if (el.id !== sidebarId) {
+                    el.classList.remove('open');
+                    el.setAttribute('aria-hidden', 'true');
+                }
+            });
+        }
+        
+        sidebar.classList.toggle('open', isOpen);
         sidebarBackdrop.classList.toggle('visible', isOpen);
-        participantsSidebar.setAttribute('aria-hidden', !isOpen);
+        sidebar.setAttribute('aria-hidden', !isOpen);
+        
+        // Auto-focus chat input if opening chat
+        if (isOpen && sidebarId === 'chat-sidebar' && chatInput) {
+            setTimeout(() => chatInput.focus(), 100);
+            if (chatBadge) {
+                chatBadge.classList.add('hidden');
+            }
+        }
     }
 
     if (participantsToggle) {
-        participantsToggle.addEventListener('click', () => toggleParticipantsSidebar(true));
+        participantsToggle.addEventListener('click', () => toggleSidebar('participants-sidebar', true));
     }
 
     if (closeParticipantsBtn) {
-        closeParticipantsBtn.addEventListener('click', () => toggleParticipantsSidebar(false));
+        closeParticipantsBtn.addEventListener('click', () => toggleSidebar('participants-sidebar', false));
+    }
+
+    if (chatToggle) {
+        chatToggle.addEventListener('click', () => toggleSidebar('chat-sidebar', true));
+    }
+
+    if (closeChatBtn) {
+        closeChatBtn.addEventListener('click', () => toggleSidebar('chat-sidebar', false));
     }
 
     if (sidebarBackdrop) {
-        sidebarBackdrop.addEventListener('click', () => toggleParticipantsSidebar(false));
+        sidebarBackdrop.addEventListener('click', () => {
+            document.querySelectorAll('.sidebar-component').forEach(el => {
+                el.classList.remove('open');
+                el.setAttribute('aria-hidden', 'true');
+            });
+            sidebarBackdrop.classList.remove('visible');
+        });
+    }
+
+    // Chat Functions
+    function formatTime(isoString) {
+        const date = new Date(isoString);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function appendChatMessage(message) {
+        if (!chatMessages) return;
+        
+        const isSelf = message.username === username;
+        const msgEl = document.createElement('div');
+        msgEl.className = `chat-message ${isSelf ? 'self' : 'other'}`;
+        
+        const timeStr = formatTime(message.timestamp);
+        
+        // Simple HTML escaping for safety
+        const safeText = message.text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        
+        msgEl.innerHTML = `
+            <div class="message-meta">
+                <span class="sender">${isSelf ? 'You' : message.username}</span>
+                <span class="time">${timeStr}</span>
+            </div>
+            <div class="message-bubble">${safeText}</div>
+        `;
+        
+        chatMessages.appendChild(msgEl);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    
+    function sendChatMessage() {
+        if (!chatInput) return;
+        const text = chatInput.value.trim();
+        if (!text) return;
+        
+        socket.emit('send_chat_message', {
+            room: room,
+            username: username,
+            text: text
+        });
+        
+        chatInput.value = '';
+    }
+    
+    if (sendChatBtn) {
+        sendChatBtn.addEventListener('click', sendChatMessage);
+    }
+    
+    if (chatInput) {
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        });
     }
 
     if (copyRoomBtn) {
@@ -118,7 +226,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         editor = monaco.editor.create(editorContainer, {
-            value: "// Loading editor...\n",
+            value: "",
             language: 'javascript',
             theme: 'vs-dark', // Fallback to vs-dark while loading our custom one
             automaticLayout: true,
@@ -206,7 +314,10 @@ document.addEventListener("DOMContentLoaded", () => {
             outputConsole.classList.remove("error-text");
 
             try {
-                const response = await fetch('/run', {
+                const urlParams = new URLSearchParams(window.location.search);
+                const tabId = urlParams.get('tab') || sessionStorage.getItem('synccode_tab_id') || 'default';
+
+                const response = await fetch(`/run?tab=${tabId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ code, language, stdin })
@@ -262,6 +373,12 @@ document.addEventListener("DOMContentLoaded", () => {
             isUpdatingFromServer = false;
 
             updateParticipantsList(data.users);
+            
+            // Render existing chat history
+            if (data.chatHistory && chatMessages) {
+                chatMessages.innerHTML = ''; // clear
+                data.chatHistory.forEach(msg => appendChatMessage(msg));
+            }
         });
 
         // Handle incoming live updates from other users
@@ -304,6 +421,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Optional: scroll to bottom
             outputConsole.scrollTop = outputConsole.scrollHeight;
+        });
+
+        socket.on("chat_message", (message) => {
+            appendChatMessage(message);
+            
+            // Optional: Show visual indication on the chat toggle button if closed
+            if (chatSidebar && !chatSidebar.classList.contains('open') && chatToggle) {
+                chatToggle.style.color = 'var(--primary)';
+                setTimeout(() => chatToggle.style.color = '', 1000);
+                if (chatBadge) {
+                    chatBadge.classList.remove('hidden');
+                }
+            }
         });
 
         socket.on("disconnect", () => {

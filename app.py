@@ -352,8 +352,9 @@ def handle_join(data):
     # Initialize room state if it doesn't exist
     if room not in rooms:
         rooms[room] = {
-            'code': '// Welcome to the real-time collaborative code editor\n// Start typing below...\n\n',
-            'users': {}
+            'code': '',
+            'users': {},
+            'messages': []
         }
         
     # Register this user's SID (Session ID)
@@ -365,7 +366,8 @@ def handle_join(data):
     emit('joined', {
         'code': rooms[room]['code'], 
         'userCount': len(user_list),
-        'users': user_list
+        'users': user_list,
+        'chatHistory': rooms[room].get('messages', [])
     })
     
     # Broadcast to EVERYONE in the room that the user count has changed
@@ -398,6 +400,32 @@ def handle_run_output(data):
             'output': output,
             'isError': is_error
         }, room=room, include_self=False)
+
+@socketio.on('send_chat_message')
+def handle_chat_message(data):
+    """Handles incoming chat messages and broadcasts them."""
+    room = data.get('room')
+    username = data.get('username')
+    text = data.get('text')
+    
+    if room in rooms and username and text:
+        message = {
+            'username': username,
+            'text': text,
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }
+        # Ensure messages list exists
+        if 'messages' not in rooms[room]:
+            rooms[room]['messages'] = []
+            
+        rooms[room]['messages'].append(message)
+        
+        # Keep only the last 100 messages in memory
+        if len(rooms[room]['messages']) > 100:
+            rooms[room]['messages'] = rooms[room]['messages'][-100:]
+            
+        # Broadcast to everyone in the room
+        emit('chat_message', message, room=room)
 
 @socketio.on('disconnect')
 def handle_disconnect():

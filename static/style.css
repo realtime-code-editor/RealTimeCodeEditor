@@ -441,7 +441,7 @@ body.light-mode .theme-toggle:hover {
     gap: 1rem;
 }
 
-.participants-sidebar {
+.participants-sidebar, .chat-sidebar {
     position: fixed;
     top: calc(2rem + 64px);
     right: 1rem;
@@ -458,13 +458,15 @@ body.light-mode .theme-toggle:hover {
     flex-direction: column;
 }
 
-body.light-mode .participants-sidebar {
+body.light-mode .participants-sidebar,
+body.light-mode .chat-sidebar {
     background: rgba(255, 255, 255, 0.95);
     border-left-color: rgba(15, 23, 42, 0.08);
     color: var(--text-main);
 }
 
-body.light-mode .participants-sidebar .sidebar-header {
+body.light-mode .participants-sidebar .sidebar-header,
+body.light-mode .chat-sidebar .sidebar-header {
     color: var(--text-main);
 }
 
@@ -487,7 +489,7 @@ body.light-mode .participant-item:hover {
     background: rgba(15, 23, 42, 0.1);
 }
 
-.participants-sidebar.open {
+.participants-sidebar.open, .chat-sidebar.open {
     transform: translateX(0);
 }
 
@@ -575,6 +577,154 @@ body.light-mode .participant-item:hover {
     justify-content: center;
     font-weight: bold;
     font-size: 0.85rem;
+}
+/* Chat Specific Styles */
+.chat-toggle {
+    position: relative;
+}
+
+.chat-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 10px;
+    height: 10px;
+    background-color: #ef4444; /* vivid red */
+    border-radius: 50%;
+    border: 2px solid var(--card-bg);
+    opacity: 1;
+    transform: scale(1);
+    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.2s;
+    pointer-events: none;
+}
+
+.chat-badge.hidden {
+    opacity: 0;
+    transform: scale(0);
+}
+
+body.light-mode .chat-badge {
+    border-color: #fff;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.chat-message {
+    display: flex;
+    flex-direction: column;
+    max-width: 90%;
+}
+
+.chat-message.self {
+    align-self: flex-end;
+}
+
+.chat-message.other {
+    align-self: flex-start;
+}
+
+.message-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.chat-message.self .message-meta {
+    justify-content: flex-end;
+}
+
+.message-meta .sender {
+    font-weight: 600;
+}
+
+.message-bubble {
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    word-break: break-word;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.chat-message.self .message-bubble {
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.chat-message.other .message-bubble {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-main);
+    border-bottom-left-radius: 4px;
+}
+
+body.light-mode .chat-message.other .message-bubble {
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.chat-input-container {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+body.light-mode .chat-input-container {
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+#chat-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    resize: none;
+    padding: 8px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    outline: none;
+    max-height: 100px;
+}
+
+body.light-mode #chat-input {
+    color: var(--text-main);
+}
+
+#chat-input::placeholder {
+    color: var(--text-muted);
+}
+
+#send-chat-btn {
+    background: var(--primary);
+    color: white;
+    padding: 8px;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+#send-chat-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+#send-chat-btn:active {
+    transform: translateY(1px);
 }
 
 /* Editor Container */

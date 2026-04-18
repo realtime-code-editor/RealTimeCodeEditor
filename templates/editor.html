@@ -66,6 +66,13 @@
                     <line x1="21" y1="12" x2="9" y2="12"></line>
                 </svg>
             </a>
+            <button id="chat-toggle" class="icon-btn chat-toggle" title="Open chat">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span id="chat-badge" class="chat-badge hidden"></span>
+            </button>
             <button id="participants-toggle" class="icon-btn participants-toggle" title="Open participants sidebar">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
@@ -80,7 +87,7 @@
     </div>
 
     <div class="editor-content-wrapper">
-        <div id="participants-sidebar" class="participants-sidebar" aria-hidden="true">
+        <div id="participants-sidebar" class="participants-sidebar sidebar-component" aria-hidden="true">
             <div class="sidebar-header">
                 <span>Participants</span>
                 <button id="close-participants" class="icon-btn close-sidebar" title="Close participants sidebar">
@@ -95,6 +102,33 @@
                 <!-- Populated by JS -->
             </div>
         </div>
+        
+        <div id="chat-sidebar" class="chat-sidebar sidebar-component" aria-hidden="true">
+            <div class="sidebar-header">
+                <span>Room Chat</span>
+                <button id="close-chat" class="icon-btn close-sidebar" title="Close chat">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                <!-- Chat messages go here -->
+            </div>
+            <div class="chat-input-container">
+                <textarea id="chat-input" placeholder="Type a message..." rows="1"></textarea>
+                <button id="send-chat-btn" class="icon-btn send-btn" title="Send message">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        
         <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
 
         <div id="editor-container" class="glass-card">
