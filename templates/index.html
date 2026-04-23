@@ -5,34 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SyncCode | Login</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sora:wght@400;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 </head>
-<body class="join-page split-layout">
-    <div class="split-left">
-        <div class="glow-bg"></div>
-        <div class="left-content">
-            <div class="brand">
-                <div class="logo-icon">{' '}</div>
-                <h1>SyncCode</h1>
-            </div>
-            <p class="hero-text">Experience real-time collaborative coding in a modern, developer-first environment.</p>
-            <div class="developer-panel">
-                <div class="panel-header">
-                    <div class="mac-dots">
-                        <span class="dot red"></span>
-                        <span class="dot yellow"></span>
-                        <span class="dot green"></span>
-                    </div>
-                    <div class="panel-title">session.js</div>
-                </div>
-                <div class="panel-body">
-                    <pre><code class="animated-text"></code><span class="cursor">|</span></pre>
-                </div>
-            </div>
-        </div>
+<body>
+    <!-- Unified glassmorphism background -->
+    <div class="app-background" aria-hidden="true">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
     </div>
-
-    <div class="split-right">
+    <!-- Page content -->
+    <div class="join-page split-layout">
         <div class="top-nav">
             <button id="theme-toggle" class="theme-toggle" title="Toggle Theme">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -42,6 +25,62 @@
                 <span id="theme-label">Dark</span>
             </button>
         </div>
+
+        <!-- ═══════════════════════════════════ LEFT PANEL ═══════════════════════════════════ -->
+        <div class="left-panel" aria-label="SyncCode feature showcase">
+            <!-- Logo + Title -->
+            <div class="lp-brand">
+                <div class="lp-logo-icon" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="url(#lp-grad)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                        <defs>
+                            <linearGradient id="lp-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#7c3aed"/>
+                                <stop offset="100%" stop-color="#c026d3"/>
+                            </linearGradient>
+                        </defs>
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                    </svg>
+                </div>
+                <span class="lp-brand-name">SyncCode</span>
+            </div>
+
+            <!-- Tagline -->
+            <p class="lp-tagline">
+                Experience real-time collaborative coding in a&nbsp;modern,
+                developer&#8209;first environment.
+            </p>
+
+            <!-- Code Preview Card -->
+            <div class="lp-code-card" id="lp-code-card">
+                <!-- Fake window chrome -->
+                <div class="lp-code-header">
+                    <div class="lp-mac-dots">
+                        <span class="lp-dot lp-dot-red"  aria-hidden="true"></span>
+                        <span class="lp-dot lp-dot-yellow" aria-hidden="true"></span>
+                        <span class="lp-dot lp-dot-green" aria-hidden="true"></span>
+                    </div>
+                    <span class="lp-file-label">session.js</span>
+                </div>
+
+                <!-- Code body -->
+                <div class="lp-code-body">
+                    <pre class="lp-code"><span class="lp-kw">const</span> <span class="lp-var">session</span> <span class="lp-op">=</span> <span class="lp-kw">new</span> <span class="lp-fn">SyncCode</span><span class="lp-pu">({</span>
+  <span class="lp-prop">workspace</span><span class="lp-pu">:</span> <span class="lp-str">"RealTimeEditor"</span><span class="lp-pu">,</span>
+  <span class="lp-prop">collaborators</span><span class="lp-pu">:</span> <span class="lp-pu">[</span><span class="lp-str">"dev1"</span><span class="lp-pu">,</span> <span class="lp-str">"dev2"</span><span class="lp-pu">],</span>
+<span class="lp-pu">});</span></pre>
+                    <span class="lp-cursor" aria-hidden="true"></span>
+                </div>
+            </div>
+
+            <!-- Subtle feature pills -->
+            <div class="lp-pills">
+                <span class="lp-pill"><span class="lp-pill-dot"></span>Live sync</span>
+                <span class="lp-pill"><span class="lp-pill-dot"></span>Multi-user</span>
+                <span class="lp-pill"><span class="lp-pill-dot"></span>Instant share</span>
+            </div>
+        </div>
+        <!-- ═══════════════════════════════════════════════════════════════════════════════════ -->
 
         <div class="glass-card join-container">
             <div class="right-header">
@@ -90,7 +129,7 @@
                 <button type="submit" class="primary-btn secondary">Signup</button>
             </form>
         </div>
-    </div>
+    </div><!-- /.join-page -->
 
     <script>
         // Typing effect for the developer panel

@@ -10,7 +10,6 @@ import sqlite3
 import functools
 from datetime import datetime
 from dotenv import load_dotenv
-#revoke to original
 load_dotenv()
 
 from werkzeug.utils import secure_filename

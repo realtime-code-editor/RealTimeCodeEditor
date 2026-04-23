@@ -7,32 +7,15 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="join-page split-layout">
-    <div class="split-left">
-        <div class="glow-bg"></div>
-        <div class="left-content">
-            <div class="brand">
-                <div class="logo-icon">{' '}</div>
-                <h1>SyncCode</h1>
-            </div>
-            <p class="hero-text">Manage your workspaces. Create a new session or join an existing room to collaborate.</p>
-            <div class="developer-panel">
-                <div class="panel-header">
-                    <div class="mac-dots">
-                        <span class="dot red"></span>
-                        <span class="dot yellow"></span>
-                        <span class="dot green"></span>
-                    </div>
-                    <div class="panel-title">status.log</div>
-                </div>
-                <div class="panel-body">
-                    <pre><code class="animated-text"></code><span class="cursor">|</span></pre>
-                </div>
-            </div>
-        </div>
+<body>
+    <!-- Unified glassmorphism background -->
+    <div class="app-background" aria-hidden="true">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
     </div>
-
-    <div class="split-right">
+    <!-- Page content -->
+    <div class="join-page split-layout">
         <div class="top-nav">
             <button id="theme-toggle" class="theme-toggle" title="Toggle Theme">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -72,7 +55,7 @@
                 <p class="subtitle">Not you? <a href="{{ url_for('logout', tab=tab) }}" style="color: var(--primary); text-decoration: none; font-weight: 500;">Logout</a></p>
             </div>
         </div>
-    </div>
+    </div><!-- /.join-page -->
 
     <script>
         // Typing effect for the developer panel
