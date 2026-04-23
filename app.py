@@ -10,7 +10,7 @@ import sqlite3
 import functools
 from datetime import datetime
 from dotenv import load_dotenv
-
+#revoke to original
 load_dotenv()
 
 app = Flask(__name__)
