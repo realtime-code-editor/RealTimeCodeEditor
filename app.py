@@ -13,12 +13,20 @@ from dotenv import load_dotenv
 #revoke to original
 load_dotenv()
 
+from werkzeug.utils import secure_filename
+from flask import send_from_directory
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'realtime-editor-super-secret'
 # Using eventlet for better WebSocket performance if available
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'users.db')
+
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB limit
 
 # State structure to hold room data: dict mapping room_id -> {'code': string, 'users': dict of sid -> username}
 rooms = {}
@@ -336,6 +344,40 @@ def run_code():
             return jsonify({"output": f"Error: Command '{cmd_name}' not found. Please ensure it is installed and in your system PATH.", "isError": True})
         except Exception as e:
             return jsonify({"output": f"Execution error: {str(e)}", "isError": True})
+
+@app.route('/upload', methods=['POST'])
+@login_required
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+        
+    room = request.form.get('room')
+    username = request.form.get('username')
+    
+    if file and room and username:
+        filename = secure_filename(file.filename)
+        unique_filename = f"{int(datetime.utcnow().timestamp())}_{filename}"
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
+        
+        file_url = url_for('uploaded_file', filename=unique_filename)
+        
+        socketio.emit('file_message', {
+            'username': username,
+            'filename': filename,
+            'url': file_url,
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }, room=room)
+        
+        return jsonify({'success': True, 'url': file_url})
+        
+    return jsonify({'error': 'Missing data'}), 400
+
+@app.route('/files/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 @socketio.on('join_room')
 def handle_join(data):

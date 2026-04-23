@@ -5,13 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SyncCode | Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="join-page">
-    <div class="glass-card join-container">
-        <div class="brand">
-            <div class="logo-icon">{' '}</div>
-            <h1>SyncCode</h1>
+<body class="join-page split-layout">
+    <div class="split-left">
+        <div class="glow-bg"></div>
+        <div class="left-content">
+            <div class="brand">
+                <div class="logo-icon">{' '}</div>
+                <h1>SyncCode</h1>
+            </div>
+            <p class="hero-text">Manage your workspaces. Create a new session or join an existing room to collaborate.</p>
+            <div class="developer-panel">
+                <div class="panel-header">
+                    <div class="mac-dots">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                    </div>
+                    <div class="panel-title">status.log</div>
+                </div>
+                <div class="panel-body">
+                    <pre><code class="animated-text"></code><span class="cursor">|</span></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="split-right">
+        <div class="top-nav">
             <button id="theme-toggle" class="theme-toggle" title="Toggle Theme">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="5"></circle>
@@ -20,33 +42,54 @@
                 <span id="theme-label">Dark</span>
             </button>
         </div>
-        <p class="subtitle">Welcome back, <strong>{{ username }}</strong>. Create a new room or join an existing one.</p>
-        <p class="subtitle">Last login date: <strong>{{ last_login_at or 'N/A' }}</strong></p>
 
-        <div class="tabs-header">
-            <button class="tab-btn active" id="tab-create">Create Room</button>
-            <button class="tab-btn" id="tab-join">Join Room</button>
-        </div>
-
-        <form id="create-form" action="/create-room" method="POST" class="tab-content active">
-            <input type="hidden" name="tab" value="{{ tab }}">
-            <button type="submit" class="primary-btn">Create New Room</button>
-        </form>
-
-        <form id="join-form" action="/editor" method="GET" class="tab-content">
-            <div class="input-group">
-                <input type="text" id="join-room" name="room" placeholder="Room ID (e.g. QBPNNN)" required autocomplete="off">
+        <div class="glass-card join-container">
+            <div class="right-header">
+                <h2>Dashboard</h2>
+                <p class="subtitle">Welcome back, <strong>{{ username }}</strong>.</p>
+                <p class="subtitle" style="font-size: 0.85rem; margin-top: -1.5rem; margin-bottom: 2rem;">Last login: {{ last_login_at or 'N/A' }}</p>
             </div>
-            <input type="hidden" name="tab" value="{{ tab }}">
-            <button type="submit" class="primary-btn secondary">Join Room</button>
-        </form>
 
-        <div class="footer-row">
-            <p class="subtitle">Not you? <a href="{{ url_for('logout', tab=tab) }}">Logout</a></p>
+            <div class="tabs-header">
+                <button class="tab-btn active" id="tab-create">Create</button>
+                <button class="tab-btn" id="tab-join">Join</button>
+            </div>
+
+            <form id="create-form" action="/create-room" method="POST" class="tab-content active">
+                <input type="hidden" name="tab" value="{{ tab }}">
+                <button type="submit" class="primary-btn">Create New Room</button>
+            </form>
+
+            <form id="join-form" action="/editor" method="GET" class="tab-content">
+                <div class="input-group">
+                    <input type="text" id="join-room" name="room" placeholder="Room ID (e.g. QBPNNN)" required autocomplete="off">
+                </div>
+                <input type="hidden" name="tab" value="{{ tab }}">
+                <button type="submit" class="primary-btn secondary">Join Room</button>
+            </form>
+
+            <div class="footer-row">
+                <p class="subtitle">Not you? <a href="{{ url_for('logout', tab=tab) }}" style="color: var(--primary); text-decoration: none; font-weight: 500;">Logout</a></p>
+            </div>
         </div>
     </div>
 
     <script>
+        // Typing effect for the developer panel
+        const textElement = document.querySelector('.animated-text');
+        if (textElement) {
+            const codeSnippet = "[SYSTEM] User authenticated successfully.\n[SYSTEM] Loading workspaces...\n[OK] 3 active sessions found.\n[OK] Ready for new connections.\n> ";
+            let i = 0;
+            const typeWriter = () => {
+                if (i < codeSnippet.length) {
+                    textElement.textContent += codeSnippet.charAt(i);
+                    i++;
+                    setTimeout(typeWriter, 20 + Math.random() * 40);
+                }
+            };
+            setTimeout(typeWriter, 500);
+        }
+
         const tabCreate = document.getElementById('tab-create');
         const tabJoin = document.getElementById('tab-join');
         const formCreate = document.getElementById('create-form');

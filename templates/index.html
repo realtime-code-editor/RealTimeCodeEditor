@@ -5,13 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SyncCode | Login</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="join-page">
-    <div class="glass-card join-container">
-        <div class="brand">
-            <div class="logo-icon">{' '}</div>
-            <h1>SyncCode</h1>
+<body class="join-page split-layout">
+    <div class="split-left">
+        <div class="glow-bg"></div>
+        <div class="left-content">
+            <div class="brand">
+                <div class="logo-icon">{' '}</div>
+                <h1>SyncCode</h1>
+            </div>
+            <p class="hero-text">Experience real-time collaborative coding in a modern, developer-first environment.</p>
+            <div class="developer-panel">
+                <div class="panel-header">
+                    <div class="mac-dots">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                    </div>
+                    <div class="panel-title">session.js</div>
+                </div>
+                <div class="panel-body">
+                    <pre><code class="animated-text"></code><span class="cursor">|</span></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="split-right">
+        <div class="top-nav">
             <button id="theme-toggle" class="theme-toggle" title="Toggle Theme">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="5"></circle>
@@ -20,51 +42,72 @@
                 <span id="theme-label">Dark</span>
             </button>
         </div>
-        <p class="subtitle">Secure collaboration starts with an account.</p>
 
-        <div class="tabs-header">
-            <button class="tab-btn {{ 'active' if action != 'signup' else '' }}" id="tab-login">Login</button>
-            <button class="tab-btn {{ 'active' if action == 'signup' else '' }}" id="tab-signup">Signup</button>
-        </div>
+        <div class="glass-card join-container">
+            <div class="right-header">
+                <h2>Welcome Back</h2>
+                <p class="subtitle">Secure collaboration starts with an account.</p>
+            </div>
 
-        {% if error %}
-            <div class="error-box">{{ error }}</div>
-        {% endif %}
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                <div class="success-box">
-                    {{ messages[0] }}
-                </div>
+            <div class="tabs-header">
+                <button class="tab-btn {{ 'active' if action != 'signup' else '' }}" id="tab-login">Login</button>
+                <button class="tab-btn {{ 'active' if action == 'signup' else '' }}" id="tab-signup">Signup</button>
+            </div>
+
+            {% if error %}
+                <div class="error-box">{{ error }}</div>
             {% endif %}
-        {% endwith %}
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="success-box">
+                        {{ messages[0] }}
+                    </div>
+                {% endif %}
+            {% endwith %}
 
-        <form id="login-form" action="/login" method="POST" class="tab-content {{ 'active' if action != 'signup' else '' }}">
-            <div class="input-group">
-                <input type="text" name="username" placeholder="Username" required autocomplete="off">
-            </div>
-            <div class="input-group">
-                <input type="password" name="password" placeholder="Password" required autocomplete="off">
-            </div>
-            <input type="hidden" name="tab" value="{{ tab }}">
-            <button type="submit" class="primary-btn">Login</button>
-        </form>
+            <form id="login-form" action="/login" method="POST" class="tab-content {{ 'active' if action != 'signup' else '' }}">
+                <div class="input-group">
+                    <input type="text" name="username" placeholder="Username" required autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <input type="password" name="password" placeholder="Password" required autocomplete="off">
+                </div>
+                <input type="hidden" name="tab" value="{{ tab }}">
+                <button type="submit" class="primary-btn">Login</button>
+            </form>
 
-        <form id="signup-form" action="/signup" method="POST" class="tab-content {{ 'active' if action == 'signup' else '' }}">
-            <div class="input-group">
-                <input type="text" name="username" placeholder="Choose a Username" required autocomplete="off">
-            </div>
-            <div class="input-group">
-                <input type="password" name="password" placeholder="Password" required autocomplete="off">
-            </div>
-            <div class="input-group">
-                <input type="password" name="confirm_password" placeholder="Confirm Password" required autocomplete="off">
-            </div>
-            <input type="hidden" name="tab" value="{{ tab }}">
-            <button type="submit" class="primary-btn secondary">Signup</button>
-        </form>
+            <form id="signup-form" action="/signup" method="POST" class="tab-content {{ 'active' if action == 'signup' else '' }}">
+                <div class="input-group">
+                    <input type="text" name="username" placeholder="Choose a Username" required autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <input type="password" name="password" placeholder="Password" required autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <input type="password" name="confirm_password" placeholder="Confirm Password" required autocomplete="off">
+                </div>
+                <input type="hidden" name="tab" value="{{ tab }}">
+                <button type="submit" class="primary-btn secondary">Signup</button>
+            </form>
+        </div>
     </div>
 
     <script>
+        // Typing effect for the developer panel
+        const textElement = document.querySelector('.animated-text');
+        if (textElement) {
+            const codeSnippet = "const session = new SyncCode({\n  workspace: \"RealTimeEditor\",\n  collaborators: true,\n  theme: \"dark\"\n});\n\nawait session.connect();\nconsole.log(\"Ready to code.\");";
+            let i = 0;
+            const typeWriter = () => {
+                if (i < codeSnippet.length) {
+                    textElement.textContent += codeSnippet.charAt(i);
+                    i++;
+                    setTimeout(typeWriter, 30 + Math.random() * 50);
+                }
+            };
+            setTimeout(typeWriter, 500);
+        }
+
         const tabLogin = document.getElementById('tab-login');
         const tabSignup = document.getElementById('tab-signup');
         const loginForm = document.getElementById('login-form');

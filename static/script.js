@@ -38,7 +38,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const otherUsers = [...users].filter(u => u !== username).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
         const hasCurrentUser = [...users].includes(username);
 
-        participantCountEl.textContent = users.length;
+        const participantCountEl = document.getElementById("sidebar-participant-count");
+        if (participantCountEl) {
+            participantCountEl.textContent = users.length;
+        }
 
         if (hasCurrentUser) {
             const el = document.createElement('div');
@@ -55,27 +58,21 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    function toggleSidebar(sidebarId, open) {
-        const sidebar = document.getElementById(sidebarId);
-        if (!sidebar) return;
-        const isOpen = typeof open === 'boolean' ? open : !sidebar.classList.contains('open');
+    function toggleSidebar(open) {
+        const rightPane = document.getElementById('right-pane');
+        const resizeHorizontal = document.getElementById('resize-horizontal');
+        if (!rightPane || !resizeHorizontal) return;
         
-        // Close all other sidebars first
-        if (isOpen) {
-            document.querySelectorAll('.sidebar-component').forEach(el => {
-                if (el.id !== sidebarId) {
-                    el.classList.remove('open');
-                    el.setAttribute('aria-hidden', 'true');
-                }
-            });
-        }
+        const isOpen = typeof open === 'boolean' ? open : rightPane.style.display === 'none';
         
-        sidebar.classList.toggle('open', isOpen);
-        sidebarBackdrop.classList.toggle('visible', isOpen);
-        sidebar.setAttribute('aria-hidden', !isOpen);
+        rightPane.style.display = isOpen ? 'flex' : 'none';
+        resizeHorizontal.style.display = isOpen ? 'flex' : 'none';
         
-        // Auto-focus chat input if opening chat
-        if (isOpen && sidebarId === 'chat-sidebar' && chatInput) {
+        // Let flexbox settle before layout recalc
+        if (editor) setTimeout(() => editor.layout(), 10);
+        
+        // Auto-focus chat input if opening
+        if (isOpen && chatInput) {
             setTimeout(() => chatInput.focus(), 100);
             if (chatBadge) {
                 chatBadge.classList.add('hidden');
@@ -84,19 +81,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (participantsToggle) {
-        participantsToggle.addEventListener('click', () => toggleSidebar('participants-sidebar', true));
+        participantsToggle.addEventListener('click', () => toggleSidebar());
     }
 
     if (closeParticipantsBtn) {
-        closeParticipantsBtn.addEventListener('click', () => toggleSidebar('participants-sidebar', false));
+        closeParticipantsBtn.addEventListener('click', () => toggleSidebar(false));
     }
 
     if (chatToggle) {
-        chatToggle.addEventListener('click', () => toggleSidebar('chat-sidebar', true));
+        chatToggle.addEventListener('click', () => toggleSidebar());
     }
 
     if (closeChatBtn) {
-        closeChatBtn.addEventListener('click', () => toggleSidebar('chat-sidebar', false));
+        closeChatBtn.addEventListener('click', () => toggleSidebar(false));
     }
 
     if (sidebarBackdrop) {
@@ -162,6 +159,117 @@ document.addEventListener("DOMContentLoaded", () => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendChatMessage();
+            }
+        });
+    }
+
+    // File Upload Logic
+    const fileUpload = document.getElementById("file-upload");
+    if (fileUpload) {
+        fileUpload.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.size > 10 * 1024 * 1024) {
+                alert("File is too large. Maximum size is 10MB.");
+                fileUpload.value = '';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('room', room);
+            formData.append('username', username);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) throw new Error('Upload failed');
+            } catch (err) {
+                console.error(err);
+                alert("File upload failed.");
+            }
+            fileUpload.value = ''; // Reset input
+        });
+    }
+
+    // Resizable Layout Logic - Horizontal & Vertical
+    const resizeHorizontal = document.getElementById('resize-horizontal');
+    const rightPane = document.getElementById('right-pane');
+    const mainWorkspace = document.querySelector('.main-workspace');
+    
+    if (resizeHorizontal && rightPane && mainWorkspace) {
+        let isDraggingH = false;
+
+        resizeHorizontal.addEventListener('mousedown', (e) => {
+            isDraggingH = true;
+            resizeHorizontal.classList.add('dragging');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDraggingH) return;
+            const containerRect = mainWorkspace.getBoundingClientRect();
+            // Calculate right pane width
+            let newWidth = containerRect.right - e.clientX;
+            // Constrain
+            if (newWidth < 250) newWidth = 250;
+            if (newWidth > containerRect.width - 300) newWidth = containerRect.width - 300;
+            
+            rightPane.style.width = `${newWidth}px`;
+            if (editor) editor.layout();
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDraggingH) {
+                isDraggingH = false;
+                resizeHorizontal.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                if (editor) editor.layout();
+            }
+        });
+    }
+
+    const resizeVertical = document.getElementById('resize-vertical');
+    const outputWrapper = document.getElementById('output-wrapper');
+    const leftColumn = document.getElementById('left-column');
+
+    if (resizeVertical && outputWrapper && leftColumn) {
+        let isDraggingV = false;
+
+        resizeVertical.addEventListener('mousedown', (e) => {
+            isDraggingV = true;
+            resizeVertical.classList.add('dragging');
+            document.body.style.cursor = 'row-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDraggingV) return;
+            const containerRect = leftColumn.getBoundingClientRect();
+            // Calculate output pane height (bottom up)
+            let newHeight = containerRect.bottom - e.clientY;
+            // Constrain
+            if (newHeight < 120) newHeight = 120; // Output min height
+            if (newHeight > containerRect.height - 200) newHeight = containerRect.height - 200; // Editor min height
+            
+            outputWrapper.style.height = `${newHeight}px`;
+            outputWrapper.style.flex = 'none'; // Ensure height applies over flex
+            if (editor) editor.layout();
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDraggingV) {
+                isDraggingV = false;
+                resizeVertical.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                if (editor) editor.layout();
             }
         });
     }
@@ -433,6 +541,44 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (chatBadge) {
                     chatBadge.classList.remove('hidden');
                 }
+            }
+        });
+
+        socket.on("file_message", (message) => {
+            const isSelf = message.username === username;
+            const msgEl = document.createElement('div');
+            msgEl.className = `chat-message ${isSelf ? 'self' : 'other'}`;
+            
+            const timeStr = formatTime(message.timestamp);
+            const safeFileName = message.filename.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            
+            msgEl.innerHTML = `
+                <div class="message-meta">
+                    <span class="sender">${isSelf ? 'You' : message.username}</span>
+                    <span class="time">${timeStr}</span>
+                </div>
+                <div class="message-bubble file-bubble">
+                    <a href="${message.url}" target="_blank" download style="color: inherit; text-decoration: underline; display: flex; align-items: center; gap: 6px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                            <polyline points="13 2 13 9 20 9"></polyline>
+                        </svg>
+                        ${safeFileName}
+                    </a>
+                </div>
+            `;
+            
+            if (chatMessages) {
+                chatMessages.appendChild(msgEl);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            // Notification dot if right pane is closed
+            const rightPane = document.getElementById('right-pane');
+            if (rightPane && rightPane.style.display === 'none' && chatToggle) {
+                chatToggle.style.color = 'var(--primary)';
+                setTimeout(() => chatToggle.style.color = '', 1000);
+                if (chatBadge) chatBadge.classList.remove('hidden');
             }
         });
 

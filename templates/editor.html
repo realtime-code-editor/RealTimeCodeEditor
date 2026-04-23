@@ -86,72 +86,76 @@
         </div>
     </div>
 
-    <div class="editor-content-wrapper">
-        <div id="participants-sidebar" class="participants-sidebar sidebar-component" aria-hidden="true">
-            <div class="sidebar-header">
-                <span>Participants</span>
-                <button id="close-participants" class="icon-btn close-sidebar" title="Close participants sidebar">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
+    <div class="main-workspace" id="main-workspace">
+        <div class="left-column" id="left-column">
+            <div class="editor-content-wrapper" id="editor-wrapper">
+                <div id="editor-container" class="glass-card">
+                    <!-- Monaco Editor mounted here via JS -->
+                </div>
             </div>
-            <div class="participants-list" id="participants-list">
-                <!-- Populated by JS -->
+            
+            <div class="resize-vertical" id="resize-vertical"></div>
+
+            <div class="output-panel glass-card" id="output-wrapper">
+                <div class="io-container">
+                    <div class="stdin-section">
+                        <div class="output-header">
+                            <span>Standard Input</span>
+                        </div>
+                        <textarea id="stdin-input" placeholder="Enter input here..." spellcheck="false"></textarea>
+                    </div>
+                    <div class="stdout-section">
+                        <div class="output-header">
+                            <span>Terminal Output</span>
+                            <button id="clear-btn" class="clear-btn">Clear</button>
+                        </div>
+                        <pre id="output-console">Waiting for execution...</pre>
+                    </div>
+                </div>
             </div>
         </div>
-        
-        <div id="chat-sidebar" class="chat-sidebar sidebar-component" aria-hidden="true">
-            <div class="sidebar-header">
-                <span>Room Chat</span>
-                <button id="close-chat" class="icon-btn close-sidebar" title="Close chat">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
+
+        <div class="resize-horizontal" id="resize-horizontal" style="display: none;"></div>
+
+        <div class="right-pane glass-card" id="right-pane" style="display: flex;">
+            <!-- Participants Section -->
+            <div class="sidebar-section participants-section">
+                <div class="section-header">
+                    <span>Participants</span>
+                    <span class="participant-count badge" id="sidebar-participant-count">1</span>
+                </div>
+                <div class="participants-list" id="participants-list">
+                    <!-- Populated by JS -->
+                </div>
             </div>
-            <div class="chat-messages" id="chat-messages">
-                <!-- Chat messages go here -->
-            </div>
-            <div class="chat-input-container">
-                <textarea id="chat-input" placeholder="Type a message..." rows="1"></textarea>
-                <button id="send-chat-btn" class="icon-btn send-btn" title="Send message">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="22" y1="2" x2="11" y2="13"></line>
-                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                    </svg>
-                </button>
+
+            <!-- Chat Section -->
+            <div class="sidebar-section chat-section">
+                <div class="section-header">
+                    <span>Room Chat</span>
+                </div>
+                <div class="chat-messages" id="chat-messages">
+                    <!-- Chat messages go here -->
+                </div>
+                <div class="chat-input-container">
+                    <label for="file-upload" class="icon-btn attach-btn" title="Attach file" style="cursor: pointer;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                        </svg>
+                    </label>
+                    <input type="file" id="file-upload" style="display: none;">
+                    <input type="text" id="chat-input" placeholder="Message room..." autocomplete="off">
+                    <button id="send-chat-btn" class="icon-btn send-btn" title="Send message">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
         
         <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
-
-        <div id="editor-container" class="glass-card">
-            <!-- Monaco Editor mounted here via JS -->
-        </div>
-    </div>
-
-    <div class="output-panel glass-card">
-        <div class="io-container">
-            <div class="stdin-section">
-                <div class="output-header">
-                    <span>Standard Input</span>
-                </div>
-                <textarea id="stdin-input" placeholder="Enter input here..." spellcheck="false"></textarea>
-            </div>
-            <div class="stdout-section">
-                <div class="output-header">
-                    <span>Terminal Output</span>
-                    <button id="clear-btn" class="clear-btn">Clear</button>
-                </div>
-                <pre id="output-console">Waiting for execution...</pre>
-            </div>
-        </div>
     </div>
 
     <!-- Hidden state inputs for JavaScript to pick up -->
