@@ -86,6 +86,45 @@ def init_db():
         conn.execute(
             "UPDATE users SET created_at = substr(created_at, 1, 10) WHERE created_at LIKE '% %'"
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                language TEXT DEFAULT 'python',
+                room_code TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS files (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                language TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY(project_id) REFERENCES projects(id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS file_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_id INTEGER NOT NULL,
+                code TEXT,
+                saved_at TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY(file_id) REFERENCES files(id)
+            )
+            """
+        )
 
 init_db()
 
@@ -239,9 +278,232 @@ def dashboard():
     return render_template(
         'dashboard.html',
         username=g.tab_username,
+        user_id=g.tab_user_id,
         last_login_at=format_date(activity['last_login_at']),
         tab=g.tab_id
     )
+
+
+@app.route('/projects/user/<int:user_id>', methods=['GET'])
+@login_required
+def get_user_projects(user_id):
+    if user_id != g.tab_user_id:
+        return jsonify({'error': 'Unauthorized'}), 403
+        
+    try:
+        with get_db() as conn:
+            projects = conn.execute(
+                "SELECT id, name, description, language, room_code, updated_at FROM projects WHERE user_id = ? ORDER BY updated_at DESC",
+                (user_id,)
+            ).fetchall()
+            
+        project_list = []
+        for p in projects:
+            project_list.append({
+                'id': p['id'],
+                'name': p['name'],
+                'description': p['description'],
+                'language': p['language'],
+                'room_code': p['room_code'],
+                'updated_at': p['updated_at']
+            })
+        return jsonify(project_list)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/projects/<int:project_id>', methods=['DELETE'])
+@login_required
+def delete_project(project_id):
+    try:
+        with get_db() as conn:
+            # Verify ownership
+            project = conn.execute(
+                "SELECT id FROM projects WHERE id = ? AND user_id = ?",
+                (project_id, g.tab_user_id)
+            ).fetchone()
+            
+            if not project:
+                return jsonify({'error': 'Unauthorized or not found'}), 403
+
+            # Delete related data in order to respect dependencies
+            # 1. Delete versions
+            conn.execute(
+                "DELETE FROM file_versions WHERE file_id IN (SELECT id FROM files WHERE project_id = ?)",
+                (project_id,)
+            )
+            # 2. Delete files
+            conn.execute(
+                "DELETE FROM files WHERE project_id = ?",
+                (project_id,)
+            )
+            # 3. Delete the project itself
+            conn.execute(
+                "DELETE FROM projects WHERE id = ?",
+                (project_id,)
+            )
+            conn.commit()
+            
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/projects/create', methods=['POST'])
+@login_required
+def create_project():
+    data = request.form
+    name = data.get('name')
+    description = data.get('description', '')
+    language = data.get('language', 'python')
+    
+    if not name:
+        return redirect(url_for('dashboard', tab=g.tab_id))
+        
+    room_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    filename = 'main.py'
+    if language == 'javascript': filename = 'index.js'
+    elif language == 'c': filename = 'main.c'
+    elif language == 'c++': filename = 'main.cpp'
+    elif language == 'java': filename = 'Main.java'
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO projects (user_id, name, description, language, room_code) VALUES (?, ?, ?, ?, ?)",
+            (g.tab_user_id, name, description, language, room_code)
+        )
+        project_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO files (project_id, filename, language) VALUES (?, ?, ?)",
+            (project_id, filename, language)
+        )
+        file_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO file_versions (file_id, code) VALUES (?, ?)",
+            (file_id, "")
+        )
+        
+    return redirect(url_for('editor', room=room_code, project_id=project_id, tab=g.tab_id))
+
+
+@app.route('/files/project/<int:project_id>', methods=['GET'])
+@login_required
+def get_project_files(project_id):
+    with get_db() as conn:
+        files = conn.execute(
+            "SELECT id, filename, language, updated_at FROM files WHERE project_id = ? ORDER BY filename ASC",
+            (project_id,)
+        ).fetchall()
+        
+    file_list = [{'id': f['id'], 'filename': f['filename'], 'language': f['language'], 'updated_at': f['updated_at']} for f in files]
+    return jsonify(file_list)
+
+
+@app.route('/files/<int:file_id>', methods=['GET'])
+@login_required
+def get_file(file_id):
+    with get_db() as conn:
+        file = conn.execute(
+            "SELECT f.id, f.filename, f.language, f.project_id FROM files f WHERE f.id = ?",
+            (file_id,)
+        ).fetchone()
+        if not file:
+            return jsonify({'error': 'Not found'}), 404
+            
+        latest_version = conn.execute(
+            "SELECT code, saved_at FROM file_versions WHERE file_id = ? ORDER BY saved_at DESC LIMIT 1",
+            (file_id,)
+        ).fetchone()
+        
+    code = latest_version['code'] if latest_version else ""
+    return jsonify({
+        'id': file['id'],
+        'filename': file['filename'],
+        'language': file['language'],
+        'code': code
+    })
+
+
+@app.route('/files/create', methods=['POST'])
+@login_required
+def create_file():
+    data = request.json
+    project_id = data.get('project_id')
+    filename = data.get('filename')
+    language = data.get('language', 'python')
+    
+    if not project_id or not filename:
+        return jsonify({'error': 'Missing data'}), 400
+        
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO files (project_id, filename, language) VALUES (?, ?, ?)",
+            (project_id, filename, language)
+        )
+        file_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO file_versions (file_id, code) VALUES (?, ?)",
+            (file_id, "")
+        )
+        
+    return jsonify({'success': True, 'id': file_id, 'filename': filename, 'language': language})
+
+
+@app.route('/files/save', methods=['POST'])
+@login_required
+def save_file():
+    data = request.json
+    file_id = data.get('file_id')
+    code = data.get('code', '')
+    
+    with get_db() as conn:
+        file = conn.execute("SELECT project_id FROM files WHERE id = ?", (file_id,)).fetchone()
+        if not file:
+            return jsonify({'error': 'Not found'}), 404
+            
+        conn.execute(
+            "INSERT INTO file_versions (file_id, code) VALUES (?, ?)",
+            (file_id, code)
+        )
+        conn.execute(
+            "UPDATE files SET updated_at = datetime('now') WHERE id = ?",
+            (file_id,)
+        )
+        conn.execute(
+            "UPDATE projects SET updated_at = datetime('now') WHERE id = ?",
+            (file['project_id'],)
+        )
+        
+    return jsonify({'success': True})
+
+
+@app.route('/files/history/<int:file_id>', methods=['GET'])
+@login_required
+def get_file_history(file_id):
+    with get_db() as conn:
+        versions = conn.execute(
+            "SELECT id, saved_at FROM file_versions WHERE file_id = ? ORDER BY saved_at DESC",
+            (file_id,)
+        ).fetchall()
+        
+    history_list = [{'id': v['id'], 'saved_at': v['saved_at']} for v in versions]
+    return jsonify(history_list)
+
+
+@app.route('/files/version/<int:version_id>', methods=['GET'])
+@login_required
+def get_file_version(version_id):
+    with get_db() as conn:
+        version = conn.execute(
+            "SELECT code FROM file_versions WHERE id = ?",
+            (version_id,)
+        ).fetchone()
+        if not version:
+            return jsonify({'error': 'Not found'}), 404
+            
+    return jsonify({'code': version['code']})
 
 
 @app.route('/create-room', methods=['POST'])
@@ -255,10 +517,32 @@ def create_room():
 @login_required
 def editor():
     room = request.args.get('room')
+    project_id = request.args.get('project_id')
+    
     if not room:
         return redirect(url_for('dashboard', tab=g.tab_id))
+        
+    project_name = None
+    
+    with get_db() as conn:
+        if project_id:
+            project = conn.execute("SELECT name FROM projects WHERE id = ?", (project_id,)).fetchone()
+            if project: project_name = project['name']
+        else:
+            # If joined by room code without project_id in URL, try to find project by room_code
+            project = conn.execute("SELECT id, name FROM projects WHERE room_code = ?", (room,)).fetchone()
+            if project:
+                project_id = project['id']
+                project_name = project['name']
 
-    return render_template('editor.html', username=g.tab_username, room=room, tab=g.tab_id)
+    return render_template(
+        'editor.html', 
+        username=g.tab_username, 
+        room=room, 
+        tab=g.tab_id,
+        project_id=project_id,
+        project_name=project_name
+    )
 
 
 @app.route('/run', methods=['POST'])

@@ -6,6 +6,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // Get metadata injected by Flask
     const username = document.getElementById("current-username").value;
     const room = document.getElementById("current-room").value;
+    const projectIdInput = document.getElementById("current-project-id");
+    const projectId = projectIdInput ? projectIdInput.value : null;
+    const initialCodeInput = document.getElementById("initial-code");
+    const initialCode = initialCodeInput ? initialCodeInput.value : "";
     const participantCountEl = document.getElementById("participant-count");
 
     const langSelector = document.getElementById("language-selector");
@@ -46,14 +50,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if (hasCurrentUser) {
             const el = document.createElement('div');
             el.className = 'participant-item';
-            el.innerHTML = `<span class="dot"></span> <span>${username} (me)</span>`;
+            const initial = username[0].toUpperCase();
+            el.innerHTML = `<span class="dot">${initial}</span> <span>${username} <em style="opacity:0.55;font-size:0.8em;">(you)</em></span>`;
             participantsList.appendChild(el);
         }
 
         otherUsers.forEach(u => {
             const el = document.createElement('div');
             el.className = 'participant-item';
-            el.innerHTML = `<span class="dot"></span> <span>${u}</span>`;
+            const initial = u[0].toUpperCase();
+            el.innerHTML = `<span class="dot">${initial}</span> <span>${u}</span>`;
             participantsList.appendChild(el);
         });
     }
@@ -334,7 +340,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         editor = monaco.editor.create(editorContainer, {
-            value: "",
+            value: initialCode,
             language: 'javascript',
             theme: 'vs-dark', // Fallback to vs-dark while loading our custom one
             automaticLayout: true,
@@ -366,10 +372,11 @@ document.addEventListener("DOMContentLoaded", () => {
         // Attach theme toggle event listener
         if (themeToggle && themeLabel) {
             themeToggle.addEventListener('click', () => {
-                document.body.classList.toggle('light-mode');
                 const isLight = document.body.classList.contains('light-mode');
-                localStorage.setItem('theme', isLight ? 'light' : 'dark');
-                themeLabel.textContent = isLight ? 'Light' : 'Dark';
+                const newMode = isLight ? 'dark' : 'light';
+                localStorage.setItem('theme', newMode);
+                // applyTheme is defined in the inline script block in editor.html
+                if (typeof applyTheme === 'function') applyTheme(newMode);
                 updateEditorTheme();
             });
         }
@@ -377,16 +384,310 @@ document.addEventListener("DOMContentLoaded", () => {
         // Once editor is ready, setup WebSockets
         setupWebSockets();
 
+        // ==========================================
+        // Multi-File State
+        // ==========================================
+        let projectFiles = {}; 
+        let currentFileId = null;
+        const fileExplorerList = document.getElementById('explorer-list');
+        const editorTabBar = document.getElementById('editor-tab-bar');
+
+        async function fetchProjectFiles() {
+            if (!projectId) return;
+            const tabParam = new URLSearchParams(window.location.search).get('tab') || 'default';
+            try {
+                const res = await fetch(`/files/project/${projectId}?tab=${tabParam}`);
+                const files = await res.json();
+                
+                const oldFiles = { ...projectFiles };
+                projectFiles = {};
+                files.forEach(f => {
+                    projectFiles[f.id] = {
+                        id: f.id,
+                        filename: f.filename,
+                        language: f.language,
+                        code: oldFiles[f.id]?.code || '',
+                        unsavedChanges: oldFiles[f.id]?.unsavedChanges || false
+                    };
+                });
+                renderFileExplorer();
+                
+                if (files.length > 0 && !currentFileId) {
+                    await switchFile(files[0].id);
+                }
+            } catch (e) {
+                console.error("Failed to fetch project files", e);
+            }
+        }
+
+        async function switchFile(fileId) {
+            if (currentFileId === fileId) return;
+            const tabParam = new URLSearchParams(window.location.search).get('tab') || 'default';
+            
+            try {
+                const res = await fetch(`/files/${fileId}?tab=${tabParam}`);
+                const data = await res.json();
+                
+                if (!projectFiles[fileId]) projectFiles[fileId] = data;
+                
+                if (!projectFiles[fileId].unsavedChanges) {
+                    projectFiles[fileId].code = data.code;
+                }
+                
+                currentFileId = fileId;
+                
+                isUpdatingFromServer = true;
+                monaco.editor.setModelLanguage(editor.getModel(), languageMap[data.language] || data.language);
+                editor.setValue(projectFiles[fileId].code || "");
+                isUpdatingFromServer = false;
+                
+                renderFileExplorer();
+                renderTabs();
+                updateSaveIndicator();
+                
+                if (langSelector) langSelector.value = data.language;
+            } catch (e) {
+                console.error("Failed to load file", e);
+            }
+        }
+
+        function renderFileExplorer() {
+            if (!fileExplorerList) return;
+            fileExplorerList.innerHTML = '';
+            
+            const files = Object.values(projectFiles).sort((a, b) => a.filename.localeCompare(b.filename));
+            
+            if (files.length === 0) {
+                fileExplorerList.innerHTML = `
+                    <div class="explorer-empty">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        <span>No files in project</span>
+                    </div>
+                `;
+                return;
+            }
+            
+            files.forEach(f => {
+                const div = document.createElement('div');
+                div.className = `explorer-item ${f.id === currentFileId ? 'active' : ''}`;
+                
+                // Subtle language-based coloring for the icon
+                let iconColor = "currentColor";
+                if (f.id === currentFileId) iconColor = "var(--primary)";
+                
+                div.innerHTML = `
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        <span>${f.filename}</span>
+                    </div>
+                    ${f.unsavedChanges ? '<span class="unsaved-dot" style="width:6px;height:6px;background:var(--accent);border-radius:50%;box-shadow: 0 0 8px var(--accent);"></span>' : ''}
+                `;
+                div.addEventListener('click', () => switchFile(f.id));
+                fileExplorerList.appendChild(div);
+            });
+        }
+
+        function renderTabs() {
+            if (!editorTabBar) return;
+            editorTabBar.innerHTML = '';
+            if (currentFileId && projectFiles[currentFileId]) {
+                const f = projectFiles[currentFileId];
+                editorTabBar.innerHTML = `
+                    <span class="editor-tab active">${f.filename} ${f.unsavedChanges ? '●' : ''}</span>
+                    <span class="editor-tab-spacer"></span>
+                `;
+            } else {
+                editorTabBar.innerHTML = `<span class="editor-tab-spacer"></span>`;
+            }
+        }
+
+        function updateSaveIndicator() {
+            const saveLabel = document.getElementById('save-label');
+            if (!saveLabel) return;
+            if (currentFileId && projectFiles[currentFileId]?.unsavedChanges) {
+                saveLabel.textContent = 'Unsaved changes';
+                saveLabel.style.color = 'var(--warning)';
+            } else {
+                saveLabel.textContent = 'Saved';
+                saveLabel.style.color = '';
+            }
+        }
+
+        const saveBtn = document.getElementById('save-btn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', async () => {
+                if (!currentFileId) return;
+                const tabParam = new URLSearchParams(window.location.search).get('tab') || 'default';
+                const saveLabel = document.getElementById('save-label');
+                saveLabel.textContent = 'Saving...';
+                saveLabel.style.color = '';
+                
+                try {
+                    const response = await fetch(`/files/save?tab=${tabParam}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ file_id: currentFileId, code: editor.getValue() })
+                    });
+                    if (response.ok) {
+                        projectFiles[currentFileId].unsavedChanges = false;
+                        updateSaveIndicator();
+                        renderFileExplorer();
+                        renderTabs();
+                    } else {
+                        saveLabel.textContent = 'Save Failed';
+                        saveLabel.style.color = 'var(--danger)';
+                    }
+                } catch (e) {
+                    console.error(e);
+                    saveLabel.textContent = 'Save Failed';
+                    saveLabel.style.color = 'var(--danger)';
+                }
+            });
+        }
+
+        const newFileBtn = document.getElementById("new-file-btn");
+        if (newFileBtn) {
+            newFileBtn.addEventListener("click", async () => {
+                const filename = prompt("Enter new filename (e.g. utils.py):");
+                if (!filename) return;
+                
+                let lang = "python";
+                if (filename.endsWith(".js")) lang = "javascript";
+                else if (filename.endsWith(".c")) lang = "c";
+                else if (filename.endsWith(".cpp")) lang = "c++";
+                else if (filename.endsWith(".java")) lang = "java";
+                else if (filename.endsWith(".html")) lang = "html";
+                else if (filename.endsWith(".css")) lang = "css";
+                
+                const tabParam = new URLSearchParams(window.location.search).get('tab') || 'default';
+                
+                try {
+                    const res = await fetch(`/files/create?tab=${tabParam}`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ project_id: projectId, filename, language: lang })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        await fetchProjectFiles();
+                        switchFile(data.id);
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            });
+        }
+
+        // ==========================================
+        // File History
+        // ==========================================
+        const historyBtn = document.getElementById('history-btn');
+        const historyModal = document.getElementById('history-modal');
+        const closeHistoryModal = document.getElementById('close-history-modal');
+        const historyList = document.getElementById('history-list');
+
+        if (historyBtn && historyModal) {
+            historyBtn.addEventListener('click', async () => {
+                if (!currentFileId) return;
+                historyModal.classList.remove('hidden');
+                historyList.innerHTML = '<div class="loading-text">Loading history...</div>';
+                
+                const tabParam = new URLSearchParams(window.location.search).get('tab') || 'default';
+                try {
+                    const res = await fetch(`/files/history/${currentFileId}?tab=${tabParam}`);
+                    const versions = await res.json();
+                    
+                    historyList.innerHTML = '';
+                    if (versions.length === 0) {
+                        historyList.innerHTML = '<div class="loading-text" style="padding: 10px;">No history found.</div>';
+                        return;
+                    }
+                    
+                    versions.forEach(v => {
+                        const div = document.createElement('div');
+                        div.className = 'history-item';
+                        div.style.padding = '12px';
+                        div.style.borderBottom = '1px solid var(--border-color)';
+                        div.style.cursor = 'pointer';
+                        
+                        div.innerHTML = `
+                            <div style="font-weight: 600; color: var(--text-main);">Version ${v.id}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">${v.saved_at}</div>
+                        `;
+                        div.addEventListener('mouseenter', () => div.style.background = 'rgba(255, 255, 255, 0.05)');
+                        div.addEventListener('mouseleave', () => div.style.background = 'transparent');
+                        if (document.body.classList.contains('light-mode')) {
+                            div.addEventListener('mouseenter', () => div.style.background = 'rgba(0, 0, 0, 0.05)');
+                        }
+                        
+                        div.addEventListener('click', async () => {
+                            try {
+                                const vRes = await fetch(`/files/version/${v.id}?tab=${tabParam}`);
+                                const vData = await vRes.json();
+                                
+                                isUpdatingFromServer = true;
+                                editor.setValue(vData.code);
+                                isUpdatingFromServer = false;
+                                
+                                projectFiles[currentFileId].code = vData.code;
+                                projectFiles[currentFileId].unsavedChanges = true;
+                                updateSaveIndicator();
+                                renderFileExplorer();
+                                renderTabs();
+                                
+                                historyModal.classList.add('hidden');
+                                
+                                socket.emit("code_change", {
+                                    room: room,
+                                    file_id: currentFileId,
+                                    code: vData.code
+                                });
+                            } catch (e) {
+                                console.error('Failed to load version', e);
+                            }
+                        });
+                        historyList.appendChild(div);
+                    });
+                } catch (e) {
+                    console.error('Failed to fetch history', e);
+                    historyList.innerHTML = '<div class="loading-text" style="color: var(--danger); padding: 10px;">Error loading history.</div>';
+                }
+            });
+            
+            closeHistoryModal.addEventListener('click', () => {
+                historyModal.classList.add('hidden');
+            });
+        }
+
+        if (projectId) {
+            fetchProjectFiles();
+        }
+
         // Listen to local typing events
         editor.onDidChangeModelContent((e) => {
             // Ignore the event if the write came from the server
             if (isUpdatingFromServer) return;
 
             const currentCode = editor.getValue();
+            
+            if (currentFileId && projectFiles[currentFileId]) {
+                projectFiles[currentFileId].code = currentCode;
+                projectFiles[currentFileId].unsavedChanges = true;
+                updateSaveIndicator();
+                renderFileExplorer();
+                renderTabs();
+            }
 
             // Broadcast changes to the room
             socket.emit("code_change", {
                 room: room,
+                file_id: currentFileId,
                 code: currentCode
             });
         });
@@ -476,9 +777,16 @@ document.addEventListener("DOMContentLoaded", () => {
         socket.on("joined", (data) => {
             console.log("Joined successfully. Initializing code state.");
 
-            isUpdatingFromServer = true;
-            editor.setValue(data.code);
-            isUpdatingFromServer = false;
+            // ONLY override if the server's code has content or if we don't have initial code
+            // (In a real app, you might sync timestamps. For now, prefer the existing state in room if any)
+            if (data.code && data.code.trim() !== '') {
+                isUpdatingFromServer = true;
+                editor.setValue(data.code);
+                isUpdatingFromServer = false;
+            } else if (initialCode && data.userCount === 1) {
+                // If we're the first one here and we have an initial code, broadcast it to the empty room so it becomes the authoritative state
+                socket.emit("code_change", { room: room, code: initialCode });
+            }
 
             updateParticipantsList(data.users);
             
@@ -493,17 +801,28 @@ document.addEventListener("DOMContentLoaded", () => {
         socket.on("code_update", (data) => {
             if (!editor) return;
 
-            isUpdatingFromServer = true;
-
-            // Note: In a production tool (like real Google Docs), we would use Operational Transformation (OT)
-            // or CRDTs. For this MVP, we override the whole value but preserve the local user's cursor.
-            const position = editor.getPosition();
-
-            editor.setValue(data.code);
-
-            editor.setPosition(position);
-
-            isUpdatingFromServer = false;
+            if (data.file_id) {
+                if (!projectFiles[data.file_id]) {
+                    projectFiles[data.file_id] = { code: data.code, unsavedChanges: false };
+                } else {
+                    projectFiles[data.file_id].code = data.code;
+                }
+                
+                if (data.file_id === currentFileId) {
+                    isUpdatingFromServer = true;
+                    const position = editor.getPosition();
+                    editor.setValue(data.code);
+                    editor.setPosition(position);
+                    isUpdatingFromServer = false;
+                }
+            } else {
+                // Fallback
+                isUpdatingFromServer = true;
+                const position = editor.getPosition();
+                editor.setValue(data.code);
+                editor.setPosition(position);
+                isUpdatingFromServer = false;
+            }
         });
 
         // Handle presence

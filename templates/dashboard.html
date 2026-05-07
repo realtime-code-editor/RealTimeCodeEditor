@@ -34,14 +34,26 @@
             </div>
 
             <div class="tabs-header">
-                <button class="tab-btn active" id="tab-create">Create</button>
-                <button class="tab-btn" id="tab-join">Join</button>
+                <button class="tab-btn active" id="tab-projects">Projects</button>
+                <button class="tab-btn" id="tab-join">Join Room</button>
             </div>
 
-            <form id="create-form" action="/create-room" method="POST" class="tab-content active">
-                <input type="hidden" name="tab" value="{{ tab }}">
-                <button type="submit" class="primary-btn">Create New Room</button>
-            </form>
+            <div id="projects-view" class="tab-content active">
+                <input type="hidden" id="current-user-id" value="{{ user_id }}">
+                <div class="projects-header">
+                    <button id="open-create-modal" class="primary-btn sm-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px;">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Create Room
+                    </button>
+                </div>
+                <div id="projects-grid" class="projects-grid">
+                    <!-- Projects will be populated here via JS -->
+                    <div class="loading-text">Loading projects...</div>
+                </div>
+            </div>
 
             <form id="join-form" action="/editor" method="GET" class="tab-content">
                 <div class="input-group">
@@ -57,8 +69,49 @@
         </div>
     </div><!-- /.join-page -->
 
+    <!-- Create Project Modal -->
+    <div id="create-modal" class="modal-backdrop hidden">
+        <div class="glass-card modal-content">
+            <div class="modal-header">
+                <h3>Create New Project</h3>
+                <button id="close-modal" class="icon-btn close-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <form id="create-project-form" action="/projects/create" method="POST">
+                <input type="hidden" name="tab" value="{{ tab }}">
+                <div class="input-group">
+                    <label for="project-name">Project Name <span style="color:var(--danger)">*</span></label>
+                    <input type="text" id="project-name" name="name" placeholder="e.g. My Awesome App" required autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <label for="project-desc">Description (Optional)</label>
+                    <input type="text" id="project-desc" name="description" placeholder="What is this project about?" autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <label for="project-lang">Language</label>
+                    <select id="project-lang" name="language" class="lang-select full-width">
+                        <option value="python">Python</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="c">C</option>
+                        <option value="c++">C++</option>
+                        <option value="java">Java</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="cancel-modal" class="primary-btn secondary">Cancel</button>
+                    <button type="submit" class="primary-btn">Create Project</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
-        // Typing effect for the developer panel
+        document.addEventListener('DOMContentLoaded', () => {
+            // Typing effect for the developer panel
         const textElement = document.querySelector('.animated-text');
         if (textElement) {
             const codeSnippet = "[SYSTEM] User authenticated successfully.\n[SYSTEM] Loading workspaces...\n[OK] 3 active sessions found.\n[OK] Ready for new connections.\n> ";
@@ -73,43 +126,140 @@
             setTimeout(typeWriter, 500);
         }
 
-        const tabCreate = document.getElementById('tab-create');
+        const tabProjects = document.getElementById('tab-projects');
         const tabJoin = document.getElementById('tab-join');
-        const formCreate = document.getElementById('create-form');
+        const viewProjects = document.getElementById('projects-view');
         const formJoin = document.getElementById('join-form');
 
-        tabCreate.addEventListener('click', () => {
-            tabCreate.classList.add('active');
+        tabProjects.addEventListener('click', () => {
+            tabProjects.classList.add('active');
             tabJoin.classList.remove('active');
-            formCreate.classList.add('active');
+            viewProjects.classList.add('active');
             formJoin.classList.remove('active');
         });
 
         tabJoin.addEventListener('click', () => {
             tabJoin.classList.add('active');
-            tabCreate.classList.remove('active');
+            tabProjects.classList.remove('active');
             formJoin.classList.add('active');
-            formCreate.classList.remove('active');
+            viewProjects.classList.remove('active');
         });
 
-        // Theme toggle functionality
-        const themeToggle = document.getElementById('theme-toggle');
-        const themeLabel = document.getElementById('theme-label');
-        if (themeToggle && themeLabel) {
-            // Load saved theme
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme === 'light') {
-                document.body.classList.add('light-mode');
-                themeLabel.textContent = 'Light';
+        // Modal Logic
+        const createModal = document.getElementById('create-modal');
+        const openModalBtn = document.getElementById('open-create-modal');
+        const closeModalBtn = document.getElementById('close-modal');
+        const cancelModalBtn = document.getElementById('cancel-modal');
+
+        const toggleModal = (show) => {
+            if (show) {
+                createModal.classList.remove('hidden');
             } else {
-                themeLabel.textContent = 'Dark';
+                createModal.classList.add('hidden');
             }
+        };
+
+        openModalBtn.addEventListener('click', () => toggleModal(true));
+        closeModalBtn.addEventListener('click', () => toggleModal(false));
+        cancelModalBtn.addEventListener('click', () => toggleModal(false));
+        createModal.addEventListener('click', (e) => {
+            if (e.target === createModal) toggleModal(false);
+        });
+
+        // Fetch Projects Logic
+        function loadProjects() {
+            const userId = document.getElementById('current-user-id')?.value;
+            if (!userId) {
+                document.getElementById('projects-grid').innerHTML = '<div class="error-text">Failed to load projects: User ID missing.</div>';
+                console.error("Missing User ID");
+                return;
+            }
+            const tabParam = new URLSearchParams(window.location.search).get('tab') || document.querySelector('input[name="tab"]')?.value || 'default';
+            
+            console.log(`Fetching projects for user_id: ${userId}`);
+            fetch(`/projects/user/${userId}?tab=${tabParam}`)
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
+                .then(projects => {
+                    console.log("API Response:", projects);
+                    const grid = document.getElementById('projects-grid');
+                    grid.innerHTML = '';
+                    
+                    if (projects.length === 0) {
+                        grid.innerHTML = '<div class="empty-state">No projects yet. Create one to get started!</div>';
+                        return;
+                    }
+                    
+                    projects.forEach(p => {
+                        const card = document.createElement('div');
+                        card.className = 'project-card';
+                        
+                        const date = new Date(p.updated_at).toLocaleDateString();
+                        
+                        card.innerHTML = `
+                            <div class="project-card-header">
+                                <h4>${p.name}</h4>
+                                <span class="lang-badge">${p.language}</span>
+                            </div>
+                            <p class="project-desc">${p.description || 'No description'}</p>
+                            <div class="project-footer">
+                                <span class="project-date">Updated: ${date}</span>
+                                <div class="project-actions">
+                                    <button class="btn-danger-soft sm-btn delete-proj-btn" data-id="${p.id}" data-name="${p.name.replace(/"/g, '&quot;')}">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    </button>
+                                    <a href="/editor?room=${p.room_code}&project_id=${p.id}&tab=${tabParam}" class="btn-gradient">Open</a>
+                                </div>
+                            </div>
+                        `;
+                        grid.appendChild(card);
+                    });
+
+                    // Add event listeners to delete buttons
+                    document.querySelectorAll('.delete-proj-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            const id = btn.getAttribute('data-id');
+                            const name = btn.getAttribute('data-name');
+                            promptDeleteProject(id, name);
+                        });
+                    });
+                })
+                .catch(err => {
+                    console.error("Fetch error:", err);
+                    document.getElementById('projects-grid').innerHTML = `<div class="error-text" style="color: var(--danger); padding: 1rem; text-align: center;">Failed to load projects: ${err.message}</div>`;
+                });
+        }
+
+        // Call load projects on start
+        loadProjects();
+
+        // Theme toggle — sets both body class + data-theme attribute
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeLabel  = document.getElementById('theme-label');
+        if (themeToggle && themeLabel) {
+            function applyThemeDash(mode) {
+                if (mode === 'light') {
+                    document.body.classList.add('light-mode');
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    themeLabel.textContent = 'Light';
+                } else {
+                    document.body.classList.remove('light-mode');
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    themeLabel.textContent = 'Dark';
+                }
+            }
+            // Load saved theme
+            applyThemeDash(localStorage.getItem('theme') === 'light' ? 'light' : 'dark');
 
             themeToggle.addEventListener('click', () => {
-                document.body.classList.toggle('light-mode');
                 const isLight = document.body.classList.contains('light-mode');
-                localStorage.setItem('theme', isLight ? 'light' : 'dark');
-                themeLabel.textContent = isLight ? 'Light' : 'Dark';
+                const newMode = isLight ? 'dark' : 'light';
+                localStorage.setItem('theme', newMode);
+                applyThemeDash(newMode);
             });
         }
 
@@ -154,6 +304,119 @@
                 }
             });
         })();
+
+        // --- Safe Delete & Toast Logic ---
+        let projectToDelete = null;
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(30px)';
+                setTimeout(() => toast.remove(), 500);
+            }, 3000);
+        }
+
+        function promptDeleteProject(id, name) {
+            projectToDelete = { id, name };
+            document.getElementById('confirm-project-name').textContent = name;
+            document.getElementById('delete-confirm-input').value = '';
+            document.getElementById('confirm-delete-btn').disabled = true;
+            document.getElementById('delete-modal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        document.getElementById('delete-confirm-input').addEventListener('input', (e) => {
+            const btn = document.getElementById('confirm-delete-btn');
+            btn.disabled = e.target.value !== projectToDelete.name;
+        });
+
+        const closeDeleteModal = () => {
+            document.getElementById('delete-modal').classList.add('hidden');
+            document.body.style.overflow = '';
+        };
+
+        document.getElementById('close-delete-modal').addEventListener('click', closeDeleteModal);
+        document.getElementById('cancel-delete').addEventListener('click', closeDeleteModal);
+
+        document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+            console.log("Delete button clicked. projectToDelete:", projectToDelete);
+            if (!projectToDelete) {
+                console.warn("No project selected for deletion.");
+                return;
+            }
+            
+            const btn = document.getElementById('confirm-delete-btn');
+            const originalText = btn.textContent;
+            btn.textContent = 'Deleting...';
+            btn.disabled = true;
+
+            const tabParam = new URLSearchParams(window.location.search).get('tab') || 
+                             sessionStorage.getItem('synccode_tab_id') || 
+                             document.querySelector('input[name="tab"]')?.value || 
+                             'default';
+            
+            console.log(`Executing DELETE for project ${projectToDelete.id} with tab ${tabParam}`);
+
+            try {
+                const res = await fetch(`/projects/${projectToDelete.id}?tab=${tabParam}`, {
+                    method: 'DELETE'
+                });
+                
+                console.log("Response status:", res.status);
+                const data = await res.json();
+                console.log("Response data:", data);
+                
+                if (data.success) {
+                    showToast('Project deleted successfully');
+                    closeDeleteModal();
+                    loadProjects();
+                } else {
+                    showToast(data.error || 'Failed to delete project', 'error');
+                }
+            } catch (err) {
+                console.error("Delete operation failed:", err);
+                showToast('Error deleting project', 'error');
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false; // Re-enable so they can try again if it failed
+            }
+        });
+        });
     </script>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="modal-backdrop hidden">
+        <div class="glass-card modal-content">
+            <div class="modal-header">
+                <h3>Delete Project</h3>
+                <button id="close-delete-modal" class="icon-btn close-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="subtitle" style="margin-bottom: 24px; font-size: 0.95rem;">
+                    This action is permanent and will delete all files. Type <strong><span id="confirm-project-name" style="color: var(--text-main)"></span></strong> to confirm.
+                </p>
+                <div class="input-group">
+                    <input type="text" id="delete-confirm-input" placeholder="Enter project name" autocomplete="off" style="width: 100%;">
+                </div>
+                <div class="modal-actions">
+                    <button id="cancel-delete" class="icon-btn" style="padding: 10px 20px; font-weight: 600;">Cancel</button>
+                    <button id="confirm-delete-btn" class="btn-danger-soft" disabled style="padding: 10px 20px;">Delete Project</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
 </body>
 </html>

@@ -4,23 +4,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SyncCode collaborative editor — Room {{ room }}">
     <title>SyncCode | Room {{ room }}</title>
-    <!-- Use vanilla CSS -->
+    <!-- Styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <!-- Fonts: UI + Code -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 
 <body class="editor-page">
+    <!-- Animated glassmorphism background -->
+    <div class="app-background" aria-hidden="true">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
     <div class="topbar glass-card">
         <div class="brand-mini">
-            <div class="logo-icon mini">{' '}</div>
-            <span>SyncCode</span>
+            <div class="logo-icon mini"></div>
+            <span class="brand-name">SyncCode</span>
+        </div>
+
+        <!-- Live connection indicator -->
+        <div class="connection-status" id="connection-status" title="Connected to room">
+            <span class="status-dot"></span>
+            <span class="status-label">Live</span>
         </div>
 
         <div class="room-info" title="Copy Room ID">
-            <span class="label">Space:</span>
-            <span class="value" id="room-id-display">{{ room }}</span>
+            <span class="label">{% if project_name %}Project:{% else %}Space:{% endif %}</span>
+            <span class="value" id="room-id-display">{% if project_name %}{{ project_name }}{% else %}{{ room }}{% endif %}</span>
             <button id="copy-room-btn" class="icon-btn" title="Copy Room ID">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
@@ -31,6 +45,23 @@
         </div>
 
         <div class="execution-controls">
+            {% if project_id %}
+            <button id="save-btn" class="run-btn secondary-btn" style="background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3);">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+                <span id="save-label">Save</span>
+            </button>
+            <button id="history-btn" class="run-btn secondary-btn" style="background: rgba(99, 102, 241, 0.15); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.3);">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <span>History</span>
+            </button>
+            {% endif %}
             <select id="language-selector" class="lang-select">
                 <option value="python">Python</option>
                 <option value="javascript">JavaScript</option>
@@ -39,7 +70,11 @@
                 <option value="java">Java</option>
             </select>
             <button id="run-btn" class="run-btn">
-                <span class="icon">▶</span> Run Code
+                <!-- Play icon -->
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" class="run-icon">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                <span>Run Code</span>
             </button>
         </div>
 
@@ -87,10 +122,35 @@
     </div>
 
     <div class="main-workspace" id="main-workspace">
+        {% if project_id %}
+        <div class="file-explorer glass-card" id="file-explorer">
+            <div class="explorer-header">
+                <span class="explorer-title">Files</span>
+                <button id="new-file-btn" title="New File">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="explorer-list" id="explorer-list">
+                <!-- File items dynamically loaded -->
+            </div>
+        </div>
+        <div class="resize-vertical" id="resize-explorer" style="cursor: col-resize; width: 4px; display: none;"></div>
+        {% endif %}
+        
         <div class="left-column" id="left-column">
             <div class="editor-content-wrapper" id="editor-wrapper">
-                <div id="editor-container" class="glass-card">
-                    <!-- Monaco Editor mounted here via JS -->
+                <!-- Editor card wrapper with glow -->
+                <div class="editor-card-shell">
+                    <div class="editor-tab-bar" id="editor-tab-bar">
+                        <!-- Tabs dynamically loaded -->
+                        <span class="editor-tab-spacer"></span>
+                    </div>
+                    <div id="editor-container" class="glass-card">
+                        <!-- Monaco Editor mounted here via JS -->
+                    </div>
                 </div>
             </div>
             
@@ -100,12 +160,18 @@
                 <div class="io-container">
                     <div class="stdin-section">
                         <div class="output-header">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+                            </svg>
                             <span>Standard Input</span>
                         </div>
                         <textarea id="stdin-input" placeholder="Enter input here..." spellcheck="false"></textarea>
                     </div>
                     <div class="stdout-section">
                         <div class="output-header">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                            </svg>
                             <span>Terminal Output</span>
                             <button id="clear-btn" class="clear-btn">Clear</button>
                         </div>
@@ -121,7 +187,13 @@
             <!-- Participants Section -->
             <div class="sidebar-section participants-section">
                 <div class="section-header">
-                    <span>Participants</span>
+                    <span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:6px">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        </svg>
+                        Participants
+                    </span>
                     <span class="participant-count badge" id="sidebar-participant-count">1</span>
                 </div>
                 <div class="participants-list" id="participants-list">
@@ -132,7 +204,12 @@
             <!-- Chat Section -->
             <div class="sidebar-section chat-section">
                 <div class="section-header">
-                    <span>Room Chat</span>
+                    <span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:6px">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        Room Chat
+                    </span>
                 </div>
                 <div class="chat-messages" id="chat-messages">
                     <!-- Chat messages go here -->
@@ -156,11 +233,34 @@
         </div>
         
         <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+        
+        <!-- History Modal -->
+        <div id="history-modal" class="modal-backdrop hidden">
+            <div class="glass-card modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3>File History</h3>
+                    <button id="close-history-modal" class="icon-btn close-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body" style="max-height: 400px; overflow-y: auto; padding-top: 10px;">
+                    <div id="history-list" class="history-list">
+                        <!-- Populated by JS -->
+                        <div class="loading-text">Loading history...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Hidden state inputs for JavaScript to pick up -->
     <input type="hidden" id="current-username" value="{{ username }}">
     <input type="hidden" id="current-room" value="{{ room }}">
+    <input type="hidden" id="current-project-id" value="{{ project_id or '' }}">
+    <input type="hidden" id="initial-code" value="{{ initial_code or '' }}">
 
     <!-- Socket.IO Client via CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
@@ -171,21 +271,27 @@
     <!-- Our custom logic -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
     <script>
-        // Theme toggle functionality
+        // Theme toggle — sets both body class (compat) + data-theme attribute
         window.updateEditorTheme = function() { };
         const themeToggle = document.getElementById('theme-toggle');
-        const themeLabel = document.getElementById('theme-label');
-        if (themeToggle && themeLabel) {
-            // Load saved theme
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme === 'light') {
+        const themeLabel  = document.getElementById('theme-label');
+
+        function applyTheme(mode) {
+            // mode: 'light' | 'dark'
+            if (mode === 'light') {
                 document.body.classList.add('light-mode');
-                themeLabel.textContent = 'Light';
+                document.documentElement.setAttribute('data-theme', 'light');
+                if (themeLabel) themeLabel.textContent = 'Light';
             } else {
-                themeLabel.textContent = 'Dark';
+                document.body.classList.remove('light-mode');
+                document.documentElement.setAttribute('data-theme', 'dark');
+                if (themeLabel) themeLabel.textContent = 'Dark';
             }
-            // Event listener attached in script.js after Monaco loads
         }
+
+        // Apply saved theme on load
+        applyTheme(localStorage.getItem('theme') === 'light' ? 'light' : 'dark');
+        // Event listener for toggle button is attached in script.js after Monaco loads
 
         (function() {
             const storageKey = 'synccode_tab_id';
@@ -217,4 +323,16 @@
                 }
             });
         })();
+
+        // Sync editor tab filename with selected language
+        const _langSel = document.getElementById('language-selector');
+        const _editorFilename = document.getElementById('editor-filename');
+        const _langExtMap = { python:'main.py', javascript:'index.js', c:'main.c', 'c++':'main.cpp', java:'Main.java' };
+        if (_langSel && _editorFilename) {
+            _langSel.addEventListener('change', () => {
+                _editorFilename.textContent = _langExtMap[_langSel.value] || 'main.txt';
+            });
+        }
+    </script>
+</body>
 </html>
